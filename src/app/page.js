@@ -1,27 +1,31 @@
+"use client";
+import { useAuth } from "@/context/authContext";
+
 export default function Home() {
+  const { user, login, logout } = useAuth();
+
   return (
-    // 'bg-[#020617]' is a very deep Navy/Midnight blue
-    <main className="relative flex min-h-screen flex-col items-center justify-center bg-[#020617] p-6">
+    <main className="flex min-h-screen flex-col items-center justify-center bg-[#020617] text-white">
+      <h1 className="text-5xl font-bold mb-8">StudentOS</h1>
 
-      {/* The "Glow" - This creates the blue atmosphere */}
-      <div className="absolute w-[500px] h-[500px] bg-blue-600/20 rounded-full blur-[120px] z-0" />
-
-      <div className="relative z-10 text-center">
-        <h2 className="text-blue-400 font-mono text-sm tracking-[0.3em] uppercase mb-4 animate-pulse">
-          StudentOS Project
-        </h2>
-
-        <h1 className="text-6xl md:text-9xl font-black tracking-tighter text-white">
-          COMING <br /> SOON
-        </h1>
-
-        <div className="mt-8 h-1 w-24 bg-blue-500 mx-auto rounded-full" />
-
-        <p className="mt-8 text-slate-400 text-lg md:text-xl max-w-md mx-auto font-light">
-          An AI-powered academic workspace for the <br />
-          <span className="text-white font-medium">Google Solution Challenge 2026</span>
-        </p>
-      </div>
+      {!user ? (
+        <button
+          onClick={login}
+          className="px-8 py-4 bg-blue-600 rounded-full font-bold hover:bg-blue-500 transition-all"
+        >
+          Sign in with Google
+        </button>
+      ) : (
+        <div className="text-center">
+          <p className="text-xl mb-4">Logged in as: {user.displayName}</p>
+          <button
+            onClick={logout}
+            className="text-slate-400 underline"
+          >
+            Logout
+          </button>
+        </div>
+      )}
     </main>
   );
 }
