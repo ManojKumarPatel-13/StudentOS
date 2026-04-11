@@ -19,7 +19,7 @@
 ---
 
 ## 🛠️ Tech Stack
-- **Frontend:** [Next.js 15](https://nextjs.org/) (App Router)
+- **Frontend:** [Next.js 16](https://nextjs.org/) (App Router)
 - **Styling:** [Tailwind CSS](https://tailwindcss.com/)
 - **Intelligence:** [Google Gemini 1.5 Flash](https://ai.google.dev/)
 - **Backend/Auth:** [Firebase](https://firebase.google.com/)
