@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, MessageSquare, Camera, Calendar, BookOpen, ChevronLeft, ChevronRight, Clock, Brain, TrendingUp } from "lucide-react";
+import { Menu, X, MessageSquare, Camera, Calendar, BookOpen, ChevronLeft, ChevronRight, Clock, Brain, TrendingUp, ChevronDown } from "lucide-react";
 
 export default function LandingPage() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -433,6 +433,41 @@ export default function LandingPage() {
             </div>
           </section>
 
+          {/* FAQ SECTION */}
+          <section id="faqs" className="px-8 lg:px-16 py-32 bg-[#0A1628] border-t border-[#185FA5]/10">
+            <div className="max-w-3xl mx-auto"> {/* Narrower width for better readability */}
+
+              <div className="text-center mb-16 space-y-4">
+                <h2 className="text-4xl lg:text-5xl font-black text-white tracking-tight">Frequently Asked Questions</h2>
+                <p className="text-lg text-[#F5F0E8]/40 font-medium">Everything you need to know about StudentOS</p>
+              </div>
+
+              {/* Vertical Stack */}
+              <div className="space-y-4">
+                <FAQItem
+                  question="How does StudentOS capture lectures?"
+                  answer="You can upload audio files, record live, or sync your digital notes. Our AI transcribes and organizes them into structured study blocks instantly."
+                />
+                <FAQItem
+                  question="Can I integrate with my existing tools?"
+                  answer="Yes! StudentOS supports one-click imports from Google Drive, Notion, and Obsidian so you don't have to start from scratch."
+                />
+                <FAQItem
+                  question="Is my data secure?"
+                  answer="Absolutely. We use enterprise-grade encryption. Your notes and data are used only to train your personal AI instance—never shared or sold."
+                />
+                <FAQItem
+                  question="What subjects does the AI support?"
+                  answer="From organic chemistry to constitutional law, our models are trained on diverse academic datasets to understand complex terminologies across all majors."
+                />
+                <FAQItem
+                  question="How much does it cost?"
+                  answer="We offer a robust free tier for individual students and a Pro plan for those who need unlimited AI processing and advanced planning features."
+                />
+              </div>
+            </div>
+          </section>
+
         </main >
       </div >
     </div >
@@ -542,5 +577,43 @@ function BenefitCard({ icon, title, description, stat, delay }) {
         </div>
       </div>
     </motion.div>
+  );
+}
+
+{/* FAQ Item Component */ }
+function FAQItem({ question, answer }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div
+      onClick={() => setIsOpen(!isOpen)}
+      className={`p-6 md:p-8 rounded-[32px] border transition-all duration-300 cursor-pointer group
+        ${isOpen ? 'bg-[#0C2D5E] border-[#C9A84C]/30 shadow-2xl shadow-[#000000]/40' : 'bg-[#F5F0E8]/5 border-[#185FA5]/10 hover:border-[#185FA5]/30'}
+      `}
+    >
+      <div className="flex justify-between items-center gap-4">
+        <h4 className={`text-base md:text-lg font-bold transition-colors ${isOpen ? 'text-[#C9A84C]' : 'text-[#F5F0E8]/80'}`}>
+          {question}
+        </h4>
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${isOpen ? 'bg-[#C9A84C] text-[#0A1628] rotate-180' : 'bg-[#185FA5]/10 text-[#F5F0E8]/20'}`}>
+          <ChevronDown size={18} />
+        </div>
+      </div>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+          >
+            <p className="pt-6 text-[#F5F0E8]/50 leading-relaxed text-sm md:text-base border-t border-[#185FA5]/10 mt-6">
+              {answer}
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
