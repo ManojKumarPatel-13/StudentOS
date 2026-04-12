@@ -468,6 +468,63 @@ export default function LandingPage() {
             </div>
           </section>
 
+          {/* FINAL CONVERSION SECTION */}
+          <section className="px-8 lg:px-16 py-32 bg-[#0A1628] relative overflow-hidden">
+            {/* Background Glow Effect */}
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[500px] bg-[#185FA5]/10 blur-[120px] rounded-full -z-10" />
+
+            <div className="max-w-4xl mx-auto text-center space-y-10">
+
+              {/* Top Badge */}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#F5F0E8]/5 border border-[#185FA5]/20 backdrop-blur-md"
+              >
+                <span className="text-[#C9A84C] text-xs">✨</span>
+                <span className="text-[#F5F0E8]/60 text-[10px] font-black uppercase tracking-widest">Ready to transform your studies?</span>
+              </motion.div>
+
+              {/* Main Heading */}
+              <h2 className="text-5xl lg:text-7xl font-black text-white leading-[1.1] tracking-tight">
+                Start your smarter <br />
+                <span className="bg-gradient-to-r from-[#185FA5] via-[#C9A84C] to-[#C9A84C] bg-clip-text text-transparent italic">
+                  study journey
+                </span> today
+              </h2>
+
+              {/* Subtext */}
+              <p className="text-[#F5F0E8]/40 text-lg max-w-xl mx-auto leading-relaxed">
+                Join over 50,000 students who are already learning faster and achieving better results with StudentOS.
+              </p>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-6 pt-4">
+                <button className="group px-10 py-5 bg-[#185FA5] text-white rounded-2xl font-black text-lg flex items-center gap-3 hover:bg-[#185FA5]/80 transition-all hover:scale-105 active:scale-95 shadow-xl shadow-[#185FA5]/20">
+                  Sign Up Free
+                  <span className="group-hover:translate-x-1 transition-transform">→</span>
+                </button>
+
+                <button className="px-10 py-5 border-2 border-[#185FA5]/30 text-white rounded-2xl font-black text-lg hover:bg-white/5 transition-all">
+                  View Pricing
+                </button>
+              </div>
+
+              {/* Micro-Trust Signals */}
+              <div className="flex items-center justify-center gap-8 pt-8 text-[11px] font-bold uppercase tracking-widest text-[#F5F0E8]/20">
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#C9A84C]" />
+                  No credit card required
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#C9A84C]" />
+                  Free forever plan
+                </div>
+              </div>
+
+            </div>
+          </section>
+
         </main >
       </div >
     </div >
