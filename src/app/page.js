@@ -83,13 +83,12 @@ export default function LandingPage() {
         </AnimatePresence>
 
         {/* 3. MAIN CONTENT AREA */}
-        {/* 3. MAIN CONTENT AREA */}
         <main
-          className="transition-all duration-300 ease-in-out min-h-screen flex flex-col"
+          className="transition-all duration-300 ease-in-out min-h-screen bg-[#0A1628]"
           style={{ paddingLeft: isSidebarOpen ? (isScrolled ? '70px' : '200px') : '0px' }}
         >
           {/* The 'flex-grow' ensures this section takes up all available space below the navbar */}
-          <section className="flex-grow flex items-start justify-center px-8 lg:px-16 pt-32 pb-10">
+          <section className="relative px-8 lg:px-16 flex items-center min-h-[calc(100vh-80px)] overflow-hidden">
             <div className="max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
 
               {/* LEFT CONTENT */}
@@ -153,6 +152,86 @@ export default function LandingPage() {
                   <div className="absolute -inset-4 bg-[#185FA5]/10 blur-3xl -z-10 rounded-full"></div>
                 </motion.div>
               </div>
+
+            </div>
+          </section>
+
+          {/*ABOUT SECTION */}
+          <section id="about" className="relative px-8 lg:px-16 min-h-screen flex items-center bg-[#0A1628] border-t border-[#185FA5]/10">
+
+            <div className="max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
+
+              {/* Visual Side: The "App Preview" */}
+              <motion.div
+                initial={{ opacity: 0, x: -50 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                className="relative order-2 lg:order-1"
+              >
+                {/* Decorative Glow behind the preview */}
+                <div className="absolute -inset-10 bg-[#C9A84C]/5 blur-[100px] rounded-full" />
+
+                <div className="relative z-10 bg-[#0C2D5E]/30 border border-[#185FA5]/20 backdrop-blur-2xl rounded-[32px] p-6 shadow-2xl overflow-hidden group">
+                  {/* Mock App Header */}
+                  <div className="flex items-center gap-2 mb-6 border-b border-[#185FA5]/10 pb-4">
+                    <div className="w-3 h-3 rounded-full bg-[#185FA5]/30" />
+                    <div className="w-3 h-3 rounded-full bg-[#185FA5]/30" />
+                    <div className="w-3 h-3 rounded-full bg-[#185FA5]/30" />
+                  </div>
+
+                  {/* Mock UI Content */}
+                  <div className="space-y-4">
+                    <div className="h-4 w-1/3 bg-[#C9A84C]/20 rounded-md" />
+                    <div className="h-32 w-full bg-[#185FA5]/10 rounded-xl border border-[#185FA5]/10 flex items-center justify-center">
+                      <div className="text-[#C9A84C]/40 font-black text-xs tracking-tighter uppercase">Workspace Preview</div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="h-20 bg-[#F5F0E8]/5 rounded-xl border border-[#185FA5]/10" />
+                      <div className="h-20 bg-[#F5F0E8]/5 rounded-xl border border-[#185FA5]/10" />
+                    </div>
+                  </div>
+
+                  {/* Floating Label */}
+                  <motion.div
+                    animate={{ y: [0, -10, 0] }}
+                    transition={{ duration: 4, repeat: Infinity }}
+                    className="absolute top-1/2 -right-4 bg-[#C9A84C] text-[#0A1628] px-4 py-2 rounded-lg font-black text-[10px] shadow-xl"
+                  >
+                    v1.0 LIVE
+                  </motion.div>
+                </div>
+              </motion.div>
+
+              {/* Text Side: The "What is StudentOS" */}
+              <motion.div
+                initial={{ opacity: 0, x: 50 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                className="order-1 lg:order-2 space-y-8"
+              >
+                <div className="space-y-4">
+                  <h2 className="text-[#C9A84C] text-xs font-black uppercase tracking-[0.4em]">The Platform</h2>
+                  <h3 className="text-4xl lg:text-6xl font-black text-white leading-tight">
+                    Everything you need, <br />
+                    <span className="text-[#F5F0E8]/30 italic">in one place.</span>
+                  </h3>
+                </div>
+
+                <p className="text-lg text-[#F5F0E8]/60 leading-relaxed max-w-lg">
+                  StudentOS is an all-in-one productivity engine built specifically for students. We’ve combined a high-performance workspace with custom AI models to manage your notes, track your assignments, and tutor you through complex topics.
+                </p>
+
+                <div className="grid grid-cols-2 gap-8 pt-4">
+                  <div>
+                    <h4 className="text-white font-black text-xl mb-1">99.9%</h4>
+                    <p className="text-xs text-[#F5F0E8]/40 uppercase font-bold tracking-widest">Uptime Reliable</p>
+                  </div>
+                  <div>
+                    <h4 className="text-white font-black text-xl mb-1">0.1s</h4>
+                    <p className="text-xs text-[#F5F0E8]/40 uppercase font-bold tracking-widest">AI Response Time</p>
+                  </div>
+                </div>
+              </motion.div>
 
             </div>
           </section>
