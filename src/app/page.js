@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, MessageSquare, Camera, Calendar, BookOpen, ChevronLeft, ChevronRight, Clock, Brain, TrendingUp, ChevronDown } from "lucide-react";
+import { Menu, X, MessageSquare, Camera, Calendar, BookOpen, ChevronLeft, ChevronRight, Clock, Brain, TrendingUp, ChevronDown, Mail, Globe, Layout, User } from "lucide-react";
 
 export default function LandingPage() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -525,6 +525,56 @@ export default function LandingPage() {
             </div>
           </section>
 
+          {/* FOOTER SECTION */}
+          <footer className="px-8 lg:px-16 py-20 bg-[#0A1628] border-t border-[#185FA5]/10">
+            <div className="max-w-7xl mx-auto">
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-12 mb-16">
+
+                {/* Brand Column */}
+                <div className="col-span-2 lg:col-span-2 space-y-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-[#0C2D5E] border border-[#185FA5] rounded-lg flex items-center justify-center">
+                      <span className="font-bold text-sm text-[#C9A84C]">S</span>
+                    </div>
+                    <span className="text-xl font-black tracking-tighter text-white">StudentOS</span>
+                  </div>
+                  <p className="text-[#F5F0E8]/30 text-sm max-w-xs leading-relaxed">
+                    Your AI-powered study system for smarter learning. Built by students, for students.
+                  </p>
+                </div>
+
+                {/* Links Columns */}
+                <FooterColumn
+                  title="Product"
+                  links={["Features", "How it Works", "Pricing", "FAQ"]}
+                />
+                <FooterColumn
+                  title="Company"
+                  links={["About", "Blog", "Careers", "Contact"]}
+                />
+                <FooterColumn
+                  title="Legal"
+                  links={["Privacy", "Terms", "Security", "Cookies"]}
+                />
+              </div>
+
+              {/* Bottom Bar */}
+              <div className="pt-8 border-t border-[#185FA5]/5 flex flex-col md:flex-row justify-between items-center gap-6">
+                <p className="text-[#F5F0E8]/20 text-xs font-medium">
+                  © 2026 StudentOS. All rights reserved.
+                </p>
+
+                {/* Social Icons */}
+                <div className="flex items-center gap-4">
+                  <SocialIcon icon={<Globe size={16} />} />
+                  <SocialIcon icon={<Layout size={16} />} />
+                  <SocialIcon icon={<User size={16} />} />
+                  <SocialIcon icon={<Mail size={16} />} />
+                </div>
+              </div>
+            </div>
+          </footer>
+
         </main >
       </div >
     </div >
@@ -672,5 +722,32 @@ function FAQItem({ question, answer }) {
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+
+{/* Reusable Footer Components */ }
+function FooterColumn({ title, links }) {
+  return (
+    <div className="space-y-6">
+      <h4 className="text-white font-black text-xs uppercase tracking-[0.2em]">{title}</h4>
+      <ul className="space-y-4">
+        {links.map((link) => (
+          <li key={link}>
+            <Link href="#" className="text-[#F5F0E8]/30 text-sm hover:text-[#C9A84C] transition-colors">
+              {link}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function SocialIcon({ icon }) {
+  return (
+    <Link href="#" className="w-10 h-10 rounded-xl bg-[#F5F0E8]/5 border border-[#185FA5]/10 flex items-center justify-center text-[#F5F0E8]/30 hover:border-[#C9A84C] hover:text-[#C9A84C] transition-all">
+      {icon}
+    </Link>
   );
 }
