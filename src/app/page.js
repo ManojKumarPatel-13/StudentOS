@@ -2,11 +2,25 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, MessageSquare, Camera, Calendar, BookOpen } from "lucide-react";
+import { Menu, X, MessageSquare, Camera, Calendar, BookOpen, ChevronLeft, ChevronRight } from "lucide-react";
 
 export default function LandingPage() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true); // Control sidebar toggle
+
+  // Slider Logic
+  const screenshots = [
+    { title: "AI Dashboard", desc: "Your central hub for all academic insights and quick actions.", url: "" },
+    { title: "Smart Notes", desc: "Dynamic note-taking with real-time AI cross-referencing.", url: "" },
+    { title: "Study Planner", desc: "Automated scheduling that adapts to your exam load.", url: "" }
+  ];
+
+  const [[page, direction], setPage] = useState([0, 0]);
+  const imageIndex = Math.abs(page % screenshots.length);
+
+  const paginate = (newDirection) => {
+    setPage([page + newDirection, newDirection]);
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -235,8 +249,135 @@ export default function LandingPage() {
 
             </div>
           </section>
-        </main>
-      </div>
+
+          {/* FEATURES / WHAT YOU CAN DO SECTION */}
+          <section id="features" className="relative px-8 lg:px-16 py-24 min-h-screen flex items-center bg-[#0A1628]">
+            <div className="max-w-7xl mx-auto w-full">
+
+              {/* Section Header */}
+              <div className="text-center mb-20 space-y-4">
+                <motion.h2
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  className="text-4xl lg:text-6xl font-black text-white tracking-tight"
+                >
+                  What You Can Do
+                </motion.h2>
+                <motion.p
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 }}
+                  className="text-lg text-[#F5F0E8]/40 font-medium"
+                >
+                  Everything you need to excel in your studies
+                </motion.p>
+              </div>
+
+              {/* Feature Cards Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+
+                {/* Feature 1: Capture Lectures */}
+                <FeatureCard
+                  icon={<Camera className="w-6 h-6" />}
+                  title="Capture Lectures"
+                  description="Record and transcribe lectures instantly with AI-powered note-taking"
+                  delay={0.1}
+                />
+
+                {/* Feature 2: Generate Quizzes */}
+                <FeatureCard
+                  icon={<MessageSquare className="w-6 h-6" />}
+                  title="Generate Quizzes"
+                  description="Transform your notes into practice quizzes automatically"
+                  delay={0.2}
+                  isHighlit={true} // Adding a slight highlight to the center card like Figma
+                />
+
+                {/* Feature 3: Smart Planning */}
+                <FeatureCard
+                  icon={<Calendar className="w-6 h-6" />}
+                  title="Smart Planning"
+                  description="Organize study sessions with intelligent scheduling"
+                  delay={0.3}
+                />
+
+              </div>
+            </div>
+          </section>
+
+          {/* SLIDER SECTION: SEE IT IN ACTION */}
+          {/* REFINED SLIDER SECTION - V3 */}
+          <section className="px-8 lg:px-20 py-24 bg-[#0A1628]">
+            <div className="max-w-5xl mx-auto">
+
+              {/* Section Header */}
+              <div className="text-center mb-16 space-y-4">
+                <h2 className="text-[#C9A84C] text-[10px] font-black uppercase tracking-[0.4em]">Gallery</h2>
+                <h3 className="text-4xl lg:text-5xl font-black text-white tracking-tight">
+                  See it in <span className="italic text-[#F5F0E8]/40 text-3xl lg:text-4xl">action.</span>
+                </h3>
+              </div>
+
+              {/* Wrapper for Slider + External Buttons */}
+              <div className="relative px-16"> {/* Horizontal padding makes room for buttons outside */}
+
+                {/* Navigation Buttons - MOVED OUTSIDE THE BOX */}
+                <button
+                  onClick={() => paginate(-1)}
+                  className="absolute left-0 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full border border-[#185FA5]/20 flex items-center justify-center text-[#F5F0E8]/30 hover:border-[#C9A84C] hover:text-[#C9A84C] transition-all bg-[#0C2D5E]/10 hover:bg-[#0C2D5E]/40 z-10"
+                >
+                  <ChevronLeft className="w-6 h-6" />
+                </button>
+
+                <button
+                  onClick={() => paginate(1)}
+                  className="absolute right-0 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full border border-[#185FA5]/20 flex items-center justify-center text-[#F5F0E8]/30 hover:border-[#C9A84C] hover:text-[#C9A84C] transition-all bg-[#0C2D5E]/10 hover:bg-[#0C2D5E]/40 z-10"
+                >
+                  <ChevronRight className="w-6 h-6" />
+                </button>
+
+                {/* The Main Slider Box */}
+                <div className="relative h-[480px] w-full overflow-hidden rounded-[48px] border border-[#185FA5]/20 bg-[#0C2D5E]/10 backdrop-blur-md shadow-2xl">
+                  <AnimatePresence initial={false} custom={direction}>
+                    <motion.div
+                      key={page}
+                      custom={direction}
+                      variants={slideVariants}
+                      initial="enter"
+                      animate="center"
+                      exit="exit"
+                      transition={{
+                        x: { type: "spring", stiffness: 300, damping: 30 },
+                        opacity: { duration: 0.2 }
+                      }}
+                      className="absolute inset-0 flex flex-col items-center justify-center p-8"
+                    >
+                      {/* SCREENSHOT AREA - Increased Size */}
+                      <div className="w-full max-w-4xl h-[340px] rounded-3xl border border-[#185FA5]/10 bg-[#0A1628]/80 flex items-center justify-center relative overflow-hidden shadow-inner group">
+                        {/* This text will be replaced by your images later */}
+                        <span className="text-[#C9A84C] font-black italic tracking-tighter text-2xl opacity-10 group-hover:opacity-20 transition-opacity">
+                          {screenshots[imageIndex].title} View
+                        </span>
+
+                        {/* Decorative Dashboard Light */}
+                        <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-[#185FA5]/10 blur-[80px] rounded-full" />
+                      </div>
+
+                      {/* Caption Area */}
+                      <div className="mt-10 text-center space-y-3">
+                        <p className="text-white font-black text-3xl tracking-tight">{screenshots[imageIndex].title}</p>
+                        <p className="text-[#F5F0E8]/40 text-base max-w-lg mx-auto leading-relaxed">{screenshots[imageIndex].desc}</p>
+                      </div>
+                    </motion.div>
+                  </AnimatePresence>
+                </div>
+
+              </div>
+            </div>
+          </section>
+
+        </main >
+      </div >
     </div >
   );
 }
@@ -257,3 +398,57 @@ function SidebarItem({ icon, label, shrunk }) {
     </div>
   );
 }
+
+{/* Reusable Feature Card Component */ }
+function FeatureCard({ icon, title, description, delay, isHighlit = false }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 30 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay }}
+      whileHover={{ y: -10 }}
+      className={`relative p-10 rounded-[40px] border transition-all duration-500 group
+        ${isHighlit
+          ? 'bg-[#0C2D5E]/40 border-[#185FA5]/40 shadow-2xl shadow-[#185FA5]/10'
+          : 'bg-[#F5F0E8]/5 border-[#185FA5]/10 hover:border-[#185FA5]/30'}
+      `}
+    >
+      <div className="space-y-8 relative z-10">
+        {/* Icon Container */}
+        <div className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-colors
+          ${isHighlit ? 'bg-[#185FA5] text-white' : 'bg-[#0C2D5E] text-[#185FA5] group-hover:text-[#C9A84C]'}
+        `}>
+          {icon}
+        </div>
+
+        {/* Text Content */}
+        <div className="space-y-4">
+          <h4 className="text-2xl font-black text-white tracking-tight">{title}</h4>
+          <p className="text-[#F5F0E8]/50 leading-relaxed text-sm font-medium">
+            {description}
+          </p>
+        </div>
+      </div>
+
+      {/* Subtle Gradient Glow on Hover */}
+      <div className="absolute inset-0 bg-gradient-to-br from-[#185FA5]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-[40px]" />
+    </motion.div>
+  );
+}
+
+const slideVariants = {
+  enter: (direction) => ({
+    x: direction > 0 ? 1000 : -1000,
+    opacity: 0
+  }),
+  center: {
+    zIndex: 1,
+    x: 0,
+    opacity: 1
+  }, // FIXED: Changed ) to }
+  exit: (direction) => ({
+    zIndex: 0,
+    x: direction < 0 ? 1000 : -1000,
+    opacity: 0
+  })
+};
