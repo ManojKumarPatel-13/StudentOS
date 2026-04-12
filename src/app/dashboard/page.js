@@ -1,6 +1,6 @@
 "use client";
 import React from 'react';
-import { Calendar, CheckCircle2, Zap, Play, Target } from 'lucide-react';
+import { Calendar, CheckCircle2, Zap, Play, Target, Book, Clock, MessageSquare } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function Dashboard() {
