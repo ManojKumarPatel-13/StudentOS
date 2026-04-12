@@ -1,38 +1,35 @@
 "use client";
-import { useAuth } from "@/context/authContext";
+import React from "react";
+import Link from "next/link"; // The high-speed navigator
 
 export default function Home() {
-  const { user, login, logout } = useAuth();
-
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-[#F8F9FF] text-slate-900 font-sans">
+    <main className="flex min-h-screen flex-col items-center justify-center bg-[#F8F9FF] text-slate-900 font-sans p-6">
 
-      {/* Brand Segment */}
-      <h1 className="text-6xl font-extrabold mb-8 tracking-tight text-indigo-900">
-        StudentOS
-      </h1>
+      {/* Branding Segment */}
+      <div className="text-center space-y-4 mb-10">
+        <h1 className="text-7xl font-black tracking-tighter text-indigo-900 italic">
+          StudentOS
+        </h1>
+        <p className="text-slate-500 font-medium max-w-xs mx-auto">
+          The Central Nervous System for the modern student.
+        </p>
+      </div>
 
-      {/* Auth Segment */}
-      {!user ? (
-        <button
-          onClick={login}
-          className="px-10 py-4 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all active:scale-95"
-        >
-          Sign in with Google
-        </button>
-      ) : (
-        <div className="text-center p-8 bg-white rounded-2xl shadow-xl border border-slate-100">
-          <p className="text-xl mb-4 font-medium text-slate-700">
-            Welcome back, <span className="text-indigo-600 font-bold">{user.displayName}</span>
-          </p>
-          <button
-            onClick={logout}
-            className="text-slate-400 text-sm font-semibold hover:text-red-500 transition-colors"
-          >
-            Logout Session
+      {/* The Dynamic Navigation Button */}
+      <div className="flex flex-col gap-4 w-full max-w-xs">
+        <Link href="/login" className="w-full">
+          <button className="w-full px-8 py-4 bg-indigo-600 text-white rounded-2xl font-bold text-lg shadow-xl shadow-indigo-100 hover:bg-indigo-700 hover:-translate-y-1 transition-all active:scale-95 flex items-center justify-center gap-2">
+            Login / Register
+            <span className="text-xl">→</span>
           </button>
-        </div>
-      )}
+        </Link>
+
+        <p className="text-center text-xs text-slate-400 font-semibold tracking-wide uppercase">
+          Google Solution Challenge 2026
+        </p>
+      </div>
+
     </main>
   );
 }
