@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, MessageSquare, Camera, Calendar, BookOpen, ChevronLeft, ChevronRight } from "lucide-react";
+import { Menu, X, MessageSquare, Camera, Calendar, BookOpen, ChevronLeft, ChevronRight, Clock, Brain, TrendingUp } from "lucide-react";
 
 export default function LandingPage() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -376,6 +376,63 @@ export default function LandingPage() {
             </div>
           </section>
 
+          {/* WHY STUDENTOS SECTION */}
+          <section className="px-8 lg:px-16 py-24 bg-[#0A1628]">
+            <div className="max-w-7xl mx-auto w-full">
+
+              {/* Section Header */}
+              <div className="text-center mb-16 space-y-4">
+                <motion.h2
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  className="text-4xl lg:text-6xl font-black text-white tracking-tight"
+                >
+                  Why StudentOS?
+                </motion.h2>
+                <motion.p
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 }}
+                  className="text-lg text-[#F5F0E8]/40 font-medium"
+                >
+                  Join thousands of students achieving better results
+                </motion.p>
+              </div>
+
+              {/* Benefits Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+
+                {/* 1. Save Time */}
+                <BenefitCard
+                  icon={<Clock className="w-6 h-6" />}
+                  title="Save Time"
+                  description="Automated note-taking and organization reduces study prep by 50%"
+                  stat="✨ 10+ hours saved weekly"
+                  delay={0.1}
+                />
+
+                {/* 2. Study Smarter */}
+                <BenefitCard
+                  icon={<Brain className="w-6 h-6" />}
+                  title="Study Smarter"
+                  description="AI-generated quizzes and summaries target your weak areas"
+                  stat="✨ 3x faster retention"
+                  delay={0.2}
+                />
+
+                {/* 3. Improve Performance */}
+                <BenefitCard
+                  icon={<TrendingUp className="w-6 h-6" />}
+                  title="Improve Performance"
+                  description="Data-driven insights help you optimize your study approach"
+                  stat="✨ 92% see grade improvement"
+                  delay={0.3}
+                />
+
+              </div>
+            </div>
+          </section>
+
         </main >
       </div >
     </div >
@@ -452,3 +509,38 @@ const slideVariants = {
     opacity: 0
   })
 };
+
+
+{/* Benefit Card Component*/ }
+function BenefitCard({ icon, title, description, stat, delay }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 30 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay }}
+      className="p-10 rounded-[40px] bg-[#F5F0E8]/5 border border-[#185FA5]/10 flex flex-col h-full group hover:border-[#C9A84C]/30 transition-colors"
+    >
+      <div className="space-y-6 flex-grow">
+        {/* Icon */}
+        <div className="w-14 h-14 rounded-2xl bg-[#185FA5]/20 flex items-center justify-center text-[#185FA5] group-hover:bg-[#C9A84C] group-hover:text-[#0A1628] transition-all duration-300">
+          {icon}
+        </div>
+
+        {/* Text */}
+        <div className="space-y-3">
+          <h4 className="text-2xl font-black text-white tracking-tight">{title}</h4>
+          <p className="text-[#F5F0E8]/40 leading-relaxed text-sm font-medium">
+            {description}
+          </p>
+        </div>
+      </div>
+
+      {/* The Result Badge (Gold Tag) */}
+      <div className="mt-8 pt-6 border-t border-[#185FA5]/10">
+        <div className="inline-flex items-center px-4 py-2 rounded-xl bg-[#C9A84C]/10 border border-[#C9A84C]/20 text-[#C9A84C] text-xs font-black tracking-wide">
+          {stat}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
