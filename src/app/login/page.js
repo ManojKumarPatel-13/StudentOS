@@ -1,14 +1,29 @@
 "use client";
-import React from "react";
-// We will import hooks in Part 3
+import { auth, googleProvider } from "../../lib/firebase.js";
+import { signInWithPopup } from "firebase/auth";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
-    // PART 3 PREVIEW: We will pull these from useAuth() later
-    const handleGoogleLogin = () => console.log("Google Login Triggered");
+    const router = useRouter();
+
+    const handleGoogleLogin = async () => {
+
+        try {
+            const result = await signInWithPopup(auth, googleProvider);
+            // Success! User info is in result.user
+            console.log("Logged in as:", result.user.displayName);
+
+            // Redirect to the main dashboard
+            router.push("/dashboard");
+        } catch (error) {
+            console.error("Login failed:", error.message);
+            alert("Something went wrong with Google Login. Check the console.");
+        }
+    };
+
     const handleEmailLogin = (e) => {
         e.preventDefault();
-        console.log("Email Login Triggered");
+        console.log("Email login clicked - we'll set this up later!");
     };
 
     return (
@@ -89,12 +104,11 @@ export default function LoginPage() {
                         </div>
 
                         <button
-                            type="button"
                             onClick={handleGoogleLogin}
-                            className="w-full py-4 px-6 border border-slate-200 rounded-2xl flex items-center justify-center gap-3 hover:bg-slate-50 transition-all active:scale-[0.98] text-slate-700 font-bold shadow-sm"
+                            className="flex items-center justify-center gap-3 w-full py-4 bg-white text-black font-bold rounded-2xl hover:bg-[#F5F0E8] transition-all"
                         >
-                            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/smartlock/icon_google.svg" className="w-5 h-5" alt="Google" />
-                            Sign in with Google
+                            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/layout/google.svg" className="w-5 h-5" alt="Google" />
+                            Continue with Google
                         </button>
                     </form>
 
