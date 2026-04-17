@@ -11,7 +11,7 @@ const systemInstruction = `
   2. Execution (The core study/work tasks)
   3. Review (How to test their knowledge)
   
-  Keep responses organized, use Markdown bolding, and stay encouraging.
+  Keep responses organized, Use Less Words, Give answer in multiple paragraph, use Markdown bolding, and stay encouraging.
 `;
 
 export const model = genAI.getGenerativeModel({

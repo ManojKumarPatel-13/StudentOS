@@ -32,6 +32,6 @@
 First, clone the repository and install dependencies:
 
 ```bash
-git clone [https://github.com/YOUR_USERNAME/student-os.git](https://github.com/YOUR_USERNAME/student-os.git)
+git clone [https://github.com/ManojKumarPatel-13/StudentOS.git]
 cd student-os
 npm install
