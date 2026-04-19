@@ -1,12 +1,12 @@
 "use client";
 import React from 'react';
 import { Calendar, CheckCircle2, Zap, Play, Target, Book, Clock, MessageSquare } from 'lucide-react';
+import Sidebar from '../../components/shared/sidebar';
 import { motion } from 'framer-motion';
 
 export default function Dashboard() {
     return (
         <div className="grid grid-cols-12 gap-8">
-
             {/* LEFT & CENTER: CORE CONTENT (9 Columns) */}
             <div className="col-span-9 space-y-8">
 
