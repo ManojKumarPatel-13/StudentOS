@@ -1,27 +1,13 @@
 import React from 'react';
+import Sidebar from '../../components/shared/sidebar';
 import { Home, MessageSquare, Book, Rss, BarChart2, User, Search, Bell } from 'lucide-react';
 
 export default function DashboardLayout({ children }) {
     return (
         <div className="flex min-h-screen bg-[#0A1628] text-white font-sans">
             {/* SIDEBAR */}
-            <aside className="w-64 border-r border-[#185FA5]/10 bg-[#0C2D5E]/20 backdrop-blur-xl p-6 flex flex-col fixed h-full">
-                <div className="flex items-center gap-3 mb-10 px-2">
-                    <div className="w-8 h-8 bg-[#0C2D5E] border border-[#185FA5] rounded-lg flex items-center justify-center">
-                        <span className="font-bold text-[#C9A84C]">S</span>
-                    </div>
-                    <span className="text-xl font-black tracking-tighter">StudentOS</span>
-                </div>
+            <Sidebar activePage="home" />
 
-                <nav className="space-y-2 flex-grow">
-                    <NavItem icon={<Home size={20} />} label="Home" active />
-                    <NavItem icon={<MessageSquare size={20} />} label="AI Assistant" />
-                    <NavItem icon={<Book size={20} />} label="Journal" />
-                    <NavItem icon={<Rss size={20} />} label="Feed" />
-                    <NavItem icon={<BarChart2 size={20} />} label="Analysis" />
-                    <NavItem icon={<User size={20} />} label="Profile" />
-                </nav>
-            </aside>
 
             {/* MAIN CONTENT AREA */}
             <main className="flex-grow ml-64 p-8">
