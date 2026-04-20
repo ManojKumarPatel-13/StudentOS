@@ -433,27 +433,6 @@ export default function AnalysisPage() {
                     </Card>
                 </div>
 
-                {/* ── DAILY HOURS BAR CHART ── */}
-                <Card style={{ marginBottom: 16 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                        <div>
-                            <SectionLabel text="Study Hours" />
-                            <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Daily Study Hours — {RANGE_OPTIONS.find(r => r.key === range)?.label}</h2>
-                        </div>
-                        <span style={{ fontSize: 11, color: T.gold, fontFamily: "monospace", background: "rgba(201,168,76,0.1)", border: `1px solid ${T.borderGold}`, padding: "4px 12px", borderRadius: 100 }}>
-                            Total: {chartData.reduce((s, d) => s + (d.hours || 0), 0).toFixed(1)} hrs
-                        </span>
-                    </div>
-                    <ResponsiveContainer width="100%" height={180}>
-                        <BarChart data={chartData} margin={{ top: 5, right: 5, bottom: 0, left: -20 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(24,95,165,0.08)" />
-                            <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 10, fontFamily: "monospace" }} axisLine={false} tickLine={false} interval={range === "year" ? 30 : range === "3months" ? 6 : "preserveStartEnd"} />
-                            <YAxis tick={{ fill: T.muted, fontSize: 10, fontFamily: "monospace" }} axisLine={false} tickLine={false} />
-                            <Tooltip content={<ChartTooltip />} />
-                            <Bar dataKey="hours" fill={T.gold} radius={[4, 4, 0, 0]} fillOpacity={0.85} />
-                        </BarChart>
-                    </ResponsiveContainer>
-                </Card>
 
                 {/* ── HEATMAP + AI LOG ── */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 16, marginBottom: 16 }}>
