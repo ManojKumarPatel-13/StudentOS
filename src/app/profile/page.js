@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import {
     User, Edit2, Share2, Flame, Clock, FileText,
     Sparkles, Code, Target, Plus, Globe, LogOut,
-    ChevronRight, Eye, EyeOff, Check, X
+    ChevronRight, Eye, EyeOff, Check, X, Camera
 } from 'lucide-react';
 import { FaGithub, FaLinkedin } from 'react-icons/fa';
 import Sidebar from '@/components/shared/sidebar';
@@ -625,7 +625,7 @@ function ModalInput({ label, value, onChange, placeholder }) {
     return (
         <div className="space-y-2">
             <label className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400/60 ml-2">{label}</label>
-            <input 
+            <input
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
                 placeholder={placeholder}
