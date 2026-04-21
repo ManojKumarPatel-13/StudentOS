@@ -570,14 +570,20 @@ export default function HomePage() {
                         <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 14px" }}>Upcoming Tasks</h3>
                         <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1 }}>
                             {upcoming.slice(0, 3).map((task, i) => (
-                                <div key={task.id} className="task-row" onClick={() => handleCheckTask(task.id)} style={{
-                                    display: "flex", alignItems: "flex-start", gap: 12,
-                                    padding: "10px 12px", borderRadius: 12,
-                                    background: "rgba(12,45,94,0.4)", border: `1px solid ${C.border}`,
-                                    cursor: "pointer", transition: "all 0.2s",
-                                    animationDelay: `${0.15 + i * 0.08}s`,
-                                    opacity: task.completed ? 0.4 : 1,
-                                }} className="task-row fade-up">
+                                <div
+                                    key={task.id}
+                                    className="task-row fade-up"
+                                    onClick={() => handleCheckTask(task.id)}
+                                    style={{
+                                        display: "flex", alignItems: "flex-start", gap: 12,
+                                        padding: "10px 12px", borderRadius: 12,
+                                        background: "rgba(12,45,94,0.4)",
+                                        border: `1px solid ${C.border}`,
+                                        cursor: "pointer", transition: "all 0.2s",
+                                        animationDelay: `${0.15 + i * 0.08}s`,
+                                        opacity: task.completed ? 0.4 : 1,
+                                    }}
+                                >
                                     <div style={{ width: 18, height: 18, borderRadius: "50%", border: `2px solid ${task.completed ? C.success : C.border}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1, background: task.completed ? `${C.success}20` : "transparent" }}>
                                         {task.completed && <CheckCircle2 size={12} color={C.success} />}
                                     </div>
