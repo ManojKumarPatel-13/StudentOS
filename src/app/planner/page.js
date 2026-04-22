@@ -275,6 +275,14 @@ export default function PlannerPage() {
     const [newTask, setNewTask] = useState({ title: "", time: "", energy: "Medium", category: "Study" });
     const logRef = useRef(null);
 
+    const [chatMessages, setChatMessages] = useState([
+        { role: "ai", text: "Analyzing workload distribution...", suggestion: null },
+        { role: "ai", text: "⚠ Fatigue pattern detected in afternoon schedule. Inserting recovery block at 4:00 PM.", suggestion: null },
+        { role: "ai", text: "Optimizing deep work placement based on circadian rhythm. Context switching reduced by 34%.", suggestion: null },
+        { role: "ai", text: "Schedule looks good! You have 7h 15m planned today. Want me to optimize further?", suggestion: null },
+        { role: "ai", text: "I suggest adding a recovery block before Database Optimization.", suggestion: { title: "Recovery block at 3:30 PM", accepted: null } },
+    ]);
+
     // Tick clock
     useEffect(() => {
         const t = setInterval(() => setNowMinutes(getNowMinutes()), 60000);
@@ -311,13 +319,13 @@ export default function PlannerPage() {
         if (!command.trim()) return;
         const cmd = command;
         setCommand("");
+        setChatMessages(prev => [...prev, { role: "user", text: cmd }]);
         setIsThinking(true);
-        setAiLogs(prev => [...prev, { time: getCurrentTimeStr(), msg: `Processing: "${cmd}"` }]);
         try {
-            const res = await generatePlan(`You are a student planner AI. The user says: "${cmd}". Respond in 1-2 short sentences with a specific, actionable scheduling suggestion.`);
-            setAiLogs(prev => [...prev, { time: getCurrentTimeStr(), msg: res.replace(/\*\*/g, "").substring(0, 120), highlight: true }]);
+            const res = await generatePlan(`You are a student planner AI. User says: "${cmd}". Reply in 1-2 short sentences.`);
+            setChatMessages(prev => [...prev, { role: "ai", text: res.substring(0, 150), suggestion: null }]);
         } catch {
-            setAiLogs(prev => [...prev, { time: getCurrentTimeStr(), msg: "Command processed. Schedule updated." }]);
+            setChatMessages(prev => [...prev, { role: "ai", text: "Schedule updated.", suggestion: null }]);
         }
         setIsThinking(false);
     };
@@ -332,6 +340,17 @@ export default function PlannerPage() {
         }]);
         setAddingTask(false);
         setNewTask({ title: "", time: "", energy: "Medium", category: "Study" });
+    };
+
+    const acceptSuggestion = (msgIndex) => {
+        setChatMessages(prev => prev.map((m, i) =>
+            i === msgIndex && m.suggestion ? { ...m, suggestion: { ...m.suggestion, accepted: true } } : m
+        ));
+    };
+    const rejectSuggestion = (msgIndex) => {
+        setChatMessages(prev => prev.map((m, i) =>
+            i === msgIndex && m.suggestion ? { ...m, suggestion: { ...m.suggestion, accepted: false } } : m
+        ));
     };
 
     // Stats
@@ -373,10 +392,10 @@ export default function PlannerPage() {
             `}</style>
 
             {/* ── SHARED SIDEBAR ── */}
-            <Sidebar activePage="planner" style="marginLeft: 0," />
+            <Sidebar activePage="planner" style="marginLeft: 0" />
 
             {/* ── MAIN AREA ── */}
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden" }}>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden", marginLeft: 256 }}>
 
                 {/* Top Bar */}
                 <header style={{ padding: "12px 20px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 16, background: `rgba(10,22,40,0.8)`, backdropFilter: "blur(12px)", flexShrink: 0 }}>
@@ -557,46 +576,42 @@ export default function PlannerPage() {
                             </div>
                         </div>
 
-                        {/* AI Log Stream */}
-                        <div style={{ padding: "10px 14px 6px" }}>
-                            <p style={{ fontSize: 8, color: C.dim, fontFamily: "DM Mono", textTransform: "uppercase", letterSpacing: "0.15em", margin: "0 0 8px" }}>AI Log Stream</p>
-                        </div>
-                        <div ref={logRef} style={{ flex: "0 0 auto", maxHeight: 180, overflowY: "auto", padding: "0 14px 10px", display: "flex", flexDirection: "column", gap: 5 }}>
-                            {aiLogs.map((log, i) => (
-                                <div key={i} className="log-entry" style={{ padding: "5px 8px", borderRadius: 6, background: log.highlight ? "rgba(201,168,76,0.06)" : "rgba(12,45,94,0.2)", borderLeft: `2px solid ${log.highlight ? C.gold : C.border}` }}>
-                                    <span style={{ fontSize: 9, color: C.dim, fontFamily: "DM Mono" }}>[{log.time}] </span>
-                                    <span style={{ fontSize: 10, color: log.highlight ? "rgba(245,240,232,0.75)" : C.muted, fontFamily: "DM Mono", lineHeight: 1.5 }}>{log.msg}</span>
+                        {/* Unified Chat */}
+                        <div style={{ flex: 1, overflowY: "auto", padding: "0 14px 10px", display: "flex", flexDirection: "column", gap: 8 }}>
+                            {chatMessages.map((msg, i) => (
+                                <div key={i}>
+                                    {msg.role === "user" ? (
+                                        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                                            <div style={{ padding: "8px 12px", background: `rgba(24,95,165,0.2)`, border: `1px solid ${C.border}`, borderRadius: "12px 12px 4px 12px", maxWidth: "85%" }}>
+                                                <p style={{ fontSize: 11, color: C.white, margin: 0, fontFamily: "DM Mono" }}>{msg.text}</p>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                                            <div style={{ padding: "8px 12px", background: "rgba(12,45,94,0.4)", border: `1px solid ${C.border}`, borderRadius: "12px 12px 12px 4px" }}>
+                                                <p style={{ fontSize: 11, color: "rgba(245,240,232,0.75)", margin: 0, fontFamily: "DM Mono", lineHeight: 1.5 }}>{msg.text}</p>
+                                            </div>
+                                            {/* Inline suggestion card if AI response has one */}
+                                            {msg.suggestion && (
+                                                <div style={{ padding: "10px 12px", background: "rgba(12,45,94,0.35)", border: `1px solid ${C.border}`, borderRadius: 10 }}>
+                                                    <p style={{ fontSize: 11, fontWeight: 600, color: C.white, margin: "0 0 6px" }}>{msg.suggestion.title}</p>
+                                                    {msg.suggestion.accepted === null && (
+                                                        <div style={{ display: "flex", gap: 6 }}>
+                                                            <button onClick={() => acceptSuggestion(i)} style={{ flex: 1, padding: "5px 0", background: C.success, border: "none", borderRadius: 7, color: C.white, fontSize: 10, fontWeight: 700, cursor: "pointer" }}>✓ Accept</button>
+                                                            <button onClick={() => rejectSuggestion(i)} style={{ padding: "5px 10px", background: "transparent", border: `1px solid ${C.border}`, borderRadius: 7, color: C.muted, fontSize: 10, cursor: "pointer" }}>✕</button>
+                                                        </div>
+                                                    )}
+                                                    {msg.suggestion.accepted !== null && (
+                                                        <p style={{ fontSize: 9, color: msg.suggestion.accepted ? C.success : C.muted, fontFamily: "DM Mono", margin: 0 }}>
+                                                            {msg.suggestion.accepted ? "✓ Accepted" : "✕ Dismissed"}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             ))}
-                            {isThinking && (
-                                <div style={{ fontSize: 10, color: C.accent, fontFamily: "DM Mono", padding: "4px 8px" }}>
-                                    <span style={{ animation: "blink 1s infinite" }}>█</span> processing...
-                                </div>
-                            )}
-                        </div>
-
-                        {/* AI Suggestions */}
-                        <div style={{ padding: "8px 14px", borderTop: `1px solid ${C.border}` }}>
-                            <p style={{ fontSize: 8, color: C.dim, fontFamily: "DM Mono", textTransform: "uppercase", letterSpacing: "0.15em", margin: "0 0 8px" }}>AI Suggestions</p>
-                            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                                {suggestions.map(s => (
-                                    <div key={s.id} className="sug-card" style={{ padding: "10px 12px", borderRadius: 10, background: "rgba(12,45,94,0.35)", border: `1px solid ${C.border}`, transition: "border 0.2s", opacity: s.accepted !== null ? 0.5 : 1 }}>
-                                        <p style={{ fontSize: 11, fontWeight: 600, color: C.white, margin: "0 0 4px", lineHeight: 1.4 }}>{s.title}</p>
-                                        <p style={{ fontSize: 10, color: C.muted, fontFamily: "DM Mono", margin: "0 0 8px", lineHeight: 1.4 }}>{s.reason}</p>
-                                        {s.accepted === null ? (
-                                            <div style={{ display: "flex", gap: 6 }}>
-                                                <button onClick={() => handleSuggestion(s.id, "accept")} style={{ flex: 1, padding: "5px 0", background: C.success, border: "none", borderRadius: 7, color: C.white, fontSize: 10, fontWeight: 700, cursor: "pointer" }}>✓ Accept</button>
-                                                <button onClick={() => handleSuggestion(s.id, "modify")} style={{ padding: "5px 10px", background: "transparent", border: `1px solid ${C.border}`, borderRadius: 7, color: C.muted, fontSize: 10, cursor: "pointer" }}>Modify</button>
-                                                <button onClick={() => handleSuggestion(s.id, "reject")} style={{ padding: "5px 8px", background: "transparent", border: `1px solid ${C.border}`, borderRadius: 7, color: C.muted, fontSize: 10, cursor: "pointer" }}>✕</button>
-                                            </div>
-                                        ) : (
-                                            <p style={{ fontSize: 9, color: s.accepted === "accept" ? C.success : C.muted, fontFamily: "DM Mono" }}>
-                                                {s.accepted === "accept" ? "✓ Accepted" : "✕ Dismissed"}
-                                            </p>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
                         </div>
 
                         {/* Command Input */}
