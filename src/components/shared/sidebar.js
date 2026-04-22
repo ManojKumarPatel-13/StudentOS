@@ -9,7 +9,7 @@ export default function Sidebar() {
     const pathname = usePathname();
 
     const menuItems = [
-        { icon: <Home size={20} />, label: "Home", path: "/dashboard", id: "home" },
+        { icon: <Home size={20} />, label: "Home", path: "/home", id: "home" },
         { icon: <Calendar size={20} />, label: "Planner", path: "/planner", id: "planner" },
         { icon: <MessageSquare size={20} />, label: "Tools", path: "/study-tools", id: "tools" },
         { icon: <BarChart2 size={20} />, label: "Analysis", path: "/analysis", id: "analysis" },
@@ -22,7 +22,7 @@ export default function Sidebar() {
             {/* LOGO */}
             <div
                 className="flex items-center gap-3 mb-10 px-2 cursor-pointer"
-                onClick={() => router.push('/dashboard')}
+                onClick={() => router.push('/home')}
             >
                 <div className="w-8 h-8 bg-[#0C2D5E] border border-[#185FA5] rounded-lg flex items-center justify-center">
                     <span className="font-bold text-[#C9A84C]">S</span>

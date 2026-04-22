@@ -1,31 +1,11 @@
 /**
- * homeService.js
- * All Firestore + logic functions for the Home/Dashboard page.
- *
- * Firestore structure used:
- *   users/{uid}/tasks/{taskId}
- *     - title:      string
- *     - subject:    string
- *     - progress:   number 0-100
- *     - scheduledAt: string "HH:MM"
- *     - duration:   number (minutes)
- *     - energyCost: "low" | "medium" | "high"
- *     - completed:  boolean
- *     - date:       string "YYYY-MM-DD"
- *     - createdAt:  Timestamp
- *
- *   users/{uid}/studySessions/{id}   (same as analysisService)
- *   users/{uid}/aiLogs/{id}          (same as analysisService)
- *   users/{uid}/commands/{id}
- *     - input:  string
- *     - type:   "task" | "insight" | "note"
- *     - parsed: object
- *     - createdAt: Timestamp
+ * homeService.js - Optimized for StudentOS 2026
+ * Handles all Firestore operations for the Dashboard.
  */
 
 import {
     collection, addDoc, getDocs, updateDoc,
-    query, where, orderBy, doc, Timestamp, limit
+    query, where, orderBy, doc, Timestamp, limit, onSnapshot
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -33,13 +13,13 @@ import { db } from "@/lib/firebase";
 
 /**
  * calculateDailyOutlook()
- * Compares completed tasks vs total tasks for today.
- * Returns { status, completedCount, totalCount, percent, dayProgressPercent }
+ * Calculates productivity metrics for today.
  */
 export async function calculateDailyOutlook(uid) {
     const today = new Date().toISOString().split("T")[0];
     const ref = collection(db, "users", uid, "tasks");
     const q = query(ref, where("date", "==", today));
+
     const snap = await getDocs(q);
     const tasks = snap.docs.map(d => d.data());
 
@@ -47,13 +27,14 @@ export async function calculateDailyOutlook(uid) {
     const completed = tasks.filter(t => t.completed).length;
     const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-    // Day progress: how far through the day are we (6am–midnight = 18hr window)
+    // Optimized Day Progress: 6 AM to 11:59 PM window
     const now = new Date();
     const startOfDay = new Date(); startOfDay.setHours(6, 0, 0, 0);
-    const endOfDay = new Date(); endOfDay.setHours(24, 0, 0, 0);
-    const dayProgressPercent = Math.min(100, Math.round(
+    const endOfDay = new Date(); endOfDay.setHours(23, 59, 59, 999);
+
+    const dayProgressPercent = Math.max(0, Math.min(100, Math.round(
         ((now - startOfDay) / (endOfDay - startOfDay)) * 100
-    ));
+    )));
 
     let status = "Not Started";
     if (percent >= 80) status = "Crushing It";
@@ -64,11 +45,11 @@ export async function calculateDailyOutlook(uid) {
     return { status, completedCount: completed, totalCount: total, percent, dayProgressPercent };
 }
 
-// ── TASKS ─────────────────────────────────────────────────────────────────────
+// ── TASKS (SUB-COLLECTION PATTERN) ───────────────────────────────────────────
 
 /**
  * getUpcomingTasks()
- * Returns the next 3 tasks scheduled for today, sorted by time, not completed.
+ * Fetches next 3 non-completed tasks for today.
  */
 export async function getUpcomingTasks(uid) {
     const today = new Date().toISOString().split("T")[0];
@@ -76,18 +57,22 @@ export async function getUpcomingTasks(uid) {
     const currentTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 
     const ref = collection(db, "users", uid, "tasks");
-    const q = query(ref, where("date", "==", today), where("completed", "==", false), orderBy("scheduledAt", "asc"));
+    const q = query(
+        ref,
+        where("date", "==", today),
+        where("completed", "==", false),
+        orderBy("scheduledAt", "asc")
+    );
+
     const snap = await getDocs(q);
-    const tasks = snap.docs
+    return snap.docs
         .map(d => ({ id: d.id, ...d.data() }))
         .filter(t => t.scheduledAt >= currentTime)
         .slice(0, 3);
-    return tasks;
 }
 
 /**
  * getTodaysTasks()
- * Returns all tasks for today.
  */
 export async function getTodaysTasks(uid) {
     const today = new Date().toISOString().split("T")[0];
@@ -99,7 +84,7 @@ export async function getTodaysTasks(uid) {
 
 /**
  * addTask()
- * Creates a new task for the user.
+ * Intelligent task creation.
  */
 export async function addTask(uid, task) {
     const ref = collection(db, "users", uid, "tasks");
@@ -107,25 +92,21 @@ export async function addTask(uid, task) {
         ...task,
         completed: false,
         createdAt: Timestamp.now(),
+        date: task.date || new Date().toISOString().split("T")[0]
     });
     return docRef.id;
 }
 
-/**
- * markTaskComplete()
- * Marks a task as done.
- */
 export async function markTaskComplete(uid, taskId) {
     const ref = doc(db, "users", uid, "tasks", taskId);
     await updateDoc(ref, { completed: true });
 }
 
-// ── FOCUS SESSION ─────────────────────────────────────────────────────────────
+// ── FOCUS & MOMENTUM ──────────────────────────────────────────────────────────
 
 /**
  * logFocusSession()
- * Called when user ends a focus session.
- * Saves to studySessions (feeds into Analysis page).
+ * Saves focus data to 'studySessions' for the Intelligence Pulse chart.
  */
 export async function logFocusSession(uid, { subject, durationMinutes, focusScore }) {
     const today = new Date().toISOString().split("T")[0];
@@ -135,25 +116,15 @@ export async function logFocusSession(uid, { subject, durationMinutes, focusScor
         subject,
         hours: parseFloat((durationMinutes / 60).toFixed(2)),
         focusScore,
-        retention: Math.round(focusScore * 0.85),  // estimated
-        energy: Math.round(focusScore * 0.9),       // estimated
+        retention: Math.round(focusScore * 0.85),
+        energy: Math.round(focusScore * 0.9),
         createdAt: Timestamp.now(),
     });
 }
 
-// ── WEEKLY MOMENTUM ──────────────────────────────────────────────────────────
-
 /**
  * getWeeklyMomentum()
- * Fetches last 7 days of study sessions.
- * Returns { score, chartData, activeDays, totalHours }
- *
- * Momentum Score formula:
- *   activeDays = days in last 7 with at least 1 session
- *   avgHours   = total hours / 7
- *   avgFocus   = average focusScore across all sessions
- *   score      = round((activeDays/7 * 40) + (min(avgHours,4)/4 * 40) + (avgFocus/100 * 20))
- *   Max = 100, weights: consistency(40) + volume(40) + quality(20)
+ * Calculates the Momentum Score (Consistency + Volume + Quality).
  */
 export async function getWeeklyMomentum(uid) {
     const dates = [];
@@ -168,7 +139,6 @@ export async function getWeeklyMomentum(uid) {
     const snap = await getDocs(q);
     const sessions = snap.docs.map(d => d.data());
 
-    // Build per-day map
     const dayMap = {};
     dates.forEach(d => { dayMap[d] = { hours: 0, focusSum: 0, count: 0 }; });
     sessions.forEach(s => {
@@ -201,18 +171,8 @@ export async function getWeeklyMomentum(uid) {
     return { score, chartData, activeDays, totalHours: parseFloat(totalHours.toFixed(1)) };
 }
 
-// ── COMMAND PARSER ────────────────────────────────────────────────────────────
+// ── COMMAND UTILITIES ─────────────────────────────────────────────────────────
 
-/**
- * processCommand()
- * Routes user text input to the correct action.
- *
- * Rules (regex-based, no AI needed for speed):
- *   - Contains time pattern (6pm, 14:00, etc.) → type: "task"
- *   - Contains "note:" or "insight:" prefix → type: "insight"
- *   - Contains "remind" or "schedule" → type: "task"
- *   - Otherwise → type: "note"
- */
 export function parseCommand(input) {
     const text = input.trim();
     const timeRegex = /\b(\d{1,2}(:\d{2})?\s?(am|pm)|(\d{2}:\d{2}))\b/i;
@@ -223,53 +183,36 @@ export function parseCommand(input) {
         return { type: "insight", content: text.replace(insightKeywords, "").trim() };
     }
     if (timeRegex.test(text) || taskKeywords.test(text)) {
-        // Extract time if present
         const timeMatch = text.match(timeRegex);
-        const timeStr = timeMatch ? timeMatch[0] : null;
-        const title = text.replace(timeRegex, "").trim();
-        return { type: "task", title, scheduledAt: timeStr, raw: text };
+        let timeStr = timeMatch ? timeMatch[0] : "12:00";
+        // Simple normalization: convert '8pm' style to '20:00'
+        if (timeStr.toLowerCase().includes('pm') && !timeStr.includes('12')) {
+            let [h] = timeStr.split(/[:am|pm]/);
+            timeStr = `${parseInt(h) + 12}:00`;
+        } else if (timeStr.toLowerCase().includes('am') && timeStr.includes('12')) {
+            timeStr = "00:00";
+        }
+        const title = text.replace(timeRegex, "").replace(taskKeywords, "").trim();
+        return { type: "task", title: title || "New Task", scheduledAt: timeStr, raw: text };
     }
     return { type: "note", content: text };
 }
 
-/**
- * saveCommand()
- * Persists the parsed command to Firestore.
- */
-export async function saveCommand(uid, input, parsed) {
-    const ref = collection(db, "users", uid, "commands");
-    await addDoc(ref, { input, parsed, createdAt: Timestamp.now() });
-}
+// ── AGENTIC INFERENCE ─────────────────────────────────────────────────────────
 
-// ── AI INFERENCE ──────────────────────────────────────────────────────────────
-
-/**
- * generateAIInference()
- * Rule-based proactive tips (fast, no Gemini call needed for home page speed).
- * Returns array of tip strings based on current state.
- */
 export function generateAIInference({ outlookPercent, activeDays, totalHoursToday, currentHour, upcomingTasks }) {
     const tips = [];
-
-    if (totalHoursToday === 0 && currentHour >= 10) {
-        tips.push({ type: "ALERT", msg: "No study sessions logged today. Start a session to keep your streak alive." });
+    if (totalHoursToday === 0 && currentHour >= 11) {
+        tips.push({ type: "ALERT", msg: "Morning momentum is missing. A 15-min 'Warmup' session is recommended." });
     }
-    if (activeDays < 3) {
-        tips.push({ type: "ANALYSIS", msg: "Consistency is below par this week. Even 30-min sessions count — start small." });
+    if (activeDays >= 5) {
+        tips.push({ type: "INSIGHT", msg: "High consistency detected. You are currently in a 'Flow State' week." });
     }
-    if (currentHour >= 22) {
-        tips.push({ type: "INSIGHT", msg: "Late-night studying reduces retention by ~40%. Consider a morning review instead." });
-    }
-    if (outlookPercent >= 80) {
-        tips.push({ type: "SYSTEM", msg: "Outstanding day. You've completed 80%+ of your tasks — you're ahead of 94% of students today." });
-    }
-    if (upcomingTasks?.length > 0) {
-        const next = upcomingTasks[0];
-        tips.push({ type: "PATTERN", msg: `Next up: '${next.title}' at ${next.scheduledAt}. Prepare 5 mins early for better focus.` });
+    if (upcomingTasks?.length > 2) {
+        tips.push({ type: "ANALYSIS", msg: "Afternoon density is high. Consider moving one task to 'Low Energy' mode." });
     }
     if (tips.length === 0) {
-        tips.push({ type: "SYSTEM", msg: "System nominal. All metrics within optimal range." });
+        tips.push({ type: "SYSTEM", msg: "Neural Hub synchronized. Performance metrics are optimal." });
     }
-
     return tips;
 }

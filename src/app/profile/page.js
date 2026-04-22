@@ -6,68 +6,122 @@ import {
     Sparkles, Code, Target, Plus, Globe, LogOut,
     ChevronRight, Eye, EyeOff, Check, X, Camera
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { FaGithub, FaLinkedin } from 'react-icons/fa';
 import Sidebar from '@/components/shared/sidebar';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, updateDoc, getDoc } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 
 export default function ProfilePage() {
+    const router = useRouter();
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
-    // Toggle Logic for Appearance
-    const [theme, setTheme] = useState('dark');
 
-    // Toggle Logic for Notifications (Individual states for simplicity)
+    // --- APP STATES ---
+    const [theme, setTheme] = useState('dark');
     const [studyReminders, setStudyReminders] = useState(true);
     const [achievementAlerts, setAchievementAlerts] = useState(true);
     const [aiSuggestions, setAiSuggestions] = useState(false);
     const [emailDigest, setEmailDigest] = useState(true);
-
-    // Dropdown Logic for Preferences
     const [landingPage, setLandingPage] = useState('Home');
     const [isOpen, setIsOpen] = useState(false);
+    const [editingField, setEditingField] = useState(null);
+    const [showPassword, setShowPassword] = useState(false);
+    const [isEditingAbout, setIsEditingAbout] = useState(false);
+    const [isDeleteMode, setIsDeleteMode] = useState(false);
+    const [isModalOpen, setIsModalOpen] = useState(false);
 
-    // State for Account Info
+    // --- DATA STATES (Initialized for Sync) ---
     const [account, setAccount] = useState({
-        username: 'manojkpatel',
-        fullName: 'Manoj Kumar Patel',
-        email: 'manoj@studentos.dev',
-        joinedDate: 'April 19, 2026',
+        username: '',
+        fullName: '',
+        email: '',
+        joinedDate: '',
         is2FAEnabled: false
     });
 
-    // State to track which specific field is being edited
-    const [editingField, setEditingField] = useState(null);
+    const [heroData, setHeroData] = useState({
+        name: '',
+        major: '',
+        university: '',
+        tagline: '',
+        photoURL: null
+    });
 
-    // Security States
-    const [showPassword, setShowPassword] = useState(false);
+    const [aboutText, setAboutText] = useState("");
+    const [skillsList, setSkillsList] = useState([]);
 
-    // Function to sync individual fields to Firestore
-    const updateAccountField = async (field, value) => {
-        setAccount({ ...account, [field]: value });
-        setEditingField(null); // Close edit mode
+    // --- SYNC DATA FROM FIREBASE ---
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            if (currentUser) {
+                setUser(currentUser);
+                const userRef = doc(db, "users", currentUser.uid);
+                const docSnap = await getDoc(userRef);
 
-        if (auth.currentUser) {
-            const userRef = doc(db, "users", auth.currentUser.uid);
-            await updateDoc(userRef, {
-                [`accountInfo.${field}`]: value
-            });
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+
+                    // Sync Profile Info
+                    setHeroData({
+                        name: data.displayName || 'New Student',
+                        major: data.branch || 'Not Set',
+                        university: data.college || 'Not Set',
+                        tagline: data.profile?.hero?.tagline || 'Building with StudentOS',
+                        photoURL: currentUser.photoURL
+                    });
+
+                    // Sync Account Settings
+                    setAccount({
+                        username: data.username || currentUser.email?.split('@')[0],
+                        fullName: data.displayName || '',
+                        email: data.email || '',
+                        joinedDate: data.createdAt?.toDate().toLocaleDateString() || 'April 2026',
+                        is2FAEnabled: data.accountInfo?.is2FAEnabled || false
+                    });
+
+                    setAboutText(data.about || "Hey! I'm using StudentOS...");
+                    setSkillsList(data.skills || ['React', 'Firebase']);
+                }
+            } else {
+                router.push('/auth');
+            }
+            setLoading(false);
+        });
+        return () => unsubscribe();
+    }, [router]);
+
+    // --- ACTION FUNCTIONS ---
+
+    const handleLogout = async () => {
+        try {
+            await signOut(auth);
+            router.push('../');
+        } catch (error) {
+            console.error("Logout Error:", error);
         }
     };
 
-    const [aboutText, setAboutText] = useState("Hey! I'm Manoj, a Computer Science student at LPU...");
-    const [isEditingAbout, setIsEditingAbout] = useState(false);
-    const [isDeleteMode, setIsDeleteMode] = useState(false);
-    const [skillsList, setSkillsList] = useState(['React', 'TypeScript', 'Node.js', 'AI/ML', 'UI/UX Design', 'Python']);
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [heroData, setHeroData] = useState({
-        name: 'Manoj Kumar Patel',
-        major: 'Computer Science',
-        university: 'LPU',
-        tagline: 'Building StudentOS & learning full-stack development. Passionate about AI...',
-        photoURL: null
-    });
+    const saveAbout = async () => {
+        setIsEditingAbout(false);
+        if (auth.currentUser) {
+            const userRef = doc(db, "users", auth.currentUser.uid);
+            await updateDoc(userRef, { about: aboutText });
+        }
+    };
+
+    const updateAccountField = async (field, value) => {
+        setAccount({ ...account, [field]: value });
+        setEditingField(null);
+        if (auth.currentUser) {
+            const userRef = doc(db, "users", auth.currentUser.uid);
+            await updateDoc(userRef, {
+                [`accountInfo.${field}`]: value,
+                ...(field === 'fullName' && { displayName: value }) // Keep root name in sync
+            });
+        }
+    };
 
     // Function to handle saving from the Modal
     const handleProfileUpdate = async (newData) => {
@@ -82,13 +136,7 @@ export default function ProfilePage() {
         }
     };
 
-    useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-            setUser(currentUser);
-            setLoading(false);
-        });
-        return () => unsubscribe();
-    }, []);
+
 
     if (loading) return (
         <div className="min-h-screen bg-[#0A1628] flex items-center justify-center text-[#C9A84C] font-black uppercase tracking-widest text-xs">
@@ -161,8 +209,8 @@ export default function ProfilePage() {
                                     <Sparkles size={20} className="text-[#C9A84C]" /> About Me
                                 </h3>
                                 <button
-                                    onClick={() => setIsEditingAbout(!isEditingAbout)}
-                                    className="p-2 hover:bg-white/5 rounded-xl text-[#F5F0E8]/20 hover:text-[#C9A84C] transition-all"
+                                    onClick={isEditingAbout ? saveAbout : () => setIsEditingAbout(true)}
+                                    className="..."
                                 >
                                     {isEditingAbout ? <Check size={18} /> : <Edit2 size={18} />}
                                 </button>
@@ -406,7 +454,10 @@ export default function ProfilePage() {
                             <h3 className="text-lg font-black text-red-400 flex items-center gap-3">
                                 <LogOut size={20} /> Session
                             </h3>
-                            <button className="w-full py-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-500 font-bold flex items-center justify-center gap-3 hover:bg-red-500/20 transition-all">
+                            <button
+                                onClick={handleLogout}
+                                className="w-full py-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-500 font-bold flex items-center justify-center gap-3 hover:bg-red-500/20 transition-all"
+                            >
                                 <LogOut size={18} /> Logout from StudentOS
                             </button>
                         </div>

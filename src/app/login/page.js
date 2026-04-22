@@ -1,137 +1,175 @@
 "use client";
-import { auth, googleProvider } from "../../lib/firebase.js";
-import { signInWithPopup } from "firebase/auth";
-import { useRouter } from "next/navigation";
+import React, { useState } from 'react';
+import {
+    signInWithEmailAndPassword,
+    createUserWithEmailAndPassword,
+    signInWithPopup,
+    sendEmailVerification
+} from 'firebase/auth';
+import { auth, googleProvider, githubProvider } from '@/lib/firebase';
+import { useRouter } from 'next/navigation';
+import { Mail, Lock, User, ArrowRight, Sparkles } from 'lucide-react';
+import { FaGithub, FaGoogle } from 'react-icons/fa';
 
-export default function LoginPage() {
+export default function AuthPortal() {
+    const [isLogin, setIsLogin] = useState(true);
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [name, setName] = useState('');
+    const [loading, setLoading] = useState(false);
     const router = useRouter();
 
-    const handleGoogleLogin = async () => {
-
+    // 1. Social Login Handler (Google & GitHub)
+    const handleSocialLogin = async (provider) => {
+        setLoading(true);
         try {
-            const result = await signInWithPopup(auth, googleProvider);
-            // Success! User info is in result.user
-            console.log("Logged in as:", result.user.displayName);
-
-            // Redirect to the main dashboard
-            router.push("/dashboard");
+            const result = await signInWithPopup(auth, provider);
+            // "result.user" contains the authenticated user
+            router.push('/home');
         } catch (error) {
-            console.error("Login failed:", error.message);
-            alert("Something went wrong with Google Login. Check the console.");
+            console.error("Social Auth Error:", error.code);
+            // Error handling for account-link issues (Top 100 detail)
+            if (error.code === 'auth/account-exists-with-different-credential') {
+                alert("This email is already linked with another provider. Try logging in with Google.");
+            }
+        } finally {
+            setLoading(false);
         }
     };
 
-    const handleEmailLogin = (e) => {
+    // 2. Email/Password Logic
+    const handleAuth = async (e) => {
         e.preventDefault();
-        console.log("Email login clicked - we'll set this up later!");
+        setLoading(true);
+        try {
+            if (isLogin) {
+                // LOGIN WORKINGS
+                await signInWithEmailAndPassword(auth, email, password);
+                router.push('/home');
+            } else {
+                // SIGNUP WORKINGS
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+
+                // Professional touch: Send verification email
+                await sendEmailVerification(userCredential.user);
+
+                // Redirect to onboarding to fill College/Branch
+                router.push('/onboarding');
+            }
+        } catch (error) {
+            alert(error.message);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
-        <main className="min-h-screen w-full flex flex-col md:flex-row bg-[#FDFDFF] font-sans text-slate-900">
+        <main className="min-h-screen bg-[#0A1628] flex items-center justify-center p-6 overflow-hidden relative">
+            {/* Background Decorative Glows */}
+            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/10 blur-[120px] rounded-full" />
+            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/10 blur-[120px] rounded-full" />
 
-            {/* LEFT PANEL: The Brand Side */}
-            <section className="hidden md:flex w-1/2 bg-[#F8F9FF] flex-col justify-center px-16 relative overflow-hidden border-r border-slate-100">
-                <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-indigo-50/50 to-transparent"></div>
+            <div className="w-full max-w-[1100px] grid grid-cols-1 lg:grid-cols-2 bg-[#0C2D5E]/30 border border-white/10 rounded-[40px] backdrop-blur-3xl overflow-hidden shadow-2xl">
 
-                <div className="relative z-10 space-y-10">
-                    <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-xl shadow-indigo-100">
-                            <span className="text-white font-bold text-2xl">S</span>
-                        </div>
-                        <span className="text-3xl font-bold tracking-tight text-indigo-900">StudentOS</span>
+                {/* Left Side: Form */}
+                <div className="p-8 lg:p-16 flex flex-col justify-center space-y-8">
+                    <div>
+                        <h1 className="text-4xl font-black text-white tracking-tighter flex items-center gap-3">
+                            <Sparkles className="text-blue-400" /> {isLogin ? 'Welcome Back' : 'Initialize OS'}
+                        </h1>
+                        <p className="text-[#F5F0E8]/40 mt-2 font-medium">
+                            {isLogin ? 'Access your neural command center.' : 'Start your journey with StudentOS.'}
+                        </p>
                     </div>
 
-                    <h1 className="text-6xl font-extrabold leading-[1.1] text-slate-900">
-                        Your AI-powered <br />
-                        <span className="text-indigo-600 font-black">study system</span>
-                    </h1>
-
-                    <p className="text-xl text-slate-500 max-w-md leading-relaxed">
-                        Capture lectures, plan smarter, and learn faster with AI.
-                    </p>
-
-                    <div className="space-y-8 pt-4">
-                        <FeatureRow icon="🎙️" title="Capture lectures instantly" desc="Record and transcribe with AI-powered notes" />
-                        <FeatureRow icon="✨" title="Generate smart quizzes" desc="Test your knowledge with AI-generated questions" />
-                        <FeatureRow icon="📅" title="Plan your study day with AI" desc="Optimize your schedule for maximum productivity" />
-                    </div>
-
-                    <div className="pt-10 flex items-center gap-2 text-sm text-emerald-600 font-semibold italic">
-                        <span className="w-5 h-5 bg-emerald-100 rounded-full flex items-center justify-center text-[10px]">✓</span>
-                        Trusted by 10,000+ students worldwide
-                    </div>
-                </div>
-            </section>
-
-            {/* RIGHT PANEL: The Login Card */}
-            <section className="w-full md:w-1/2 flex items-center justify-center p-6 sm:p-12 bg-white">
-                <div className="w-full max-w-md bg-white border border-slate-100 p-10 rounded-[40px] shadow-2xl shadow-slate-100">
-                    <div className="mb-10 text-center md:text-left">
-                        <h2 className="text-4xl font-black text-slate-900 mb-2">Welcome Back</h2>
-                        <p className="text-slate-500 font-medium">Login to your account</p>
-                    </div>
-
-                    <form onSubmit={handleEmailLogin} className="space-y-6">
-                        <div className="space-y-2">
-                            <label className="text-sm font-bold text-slate-700 ml-1">Email</label>
-                            <input
-                                type="email"
-                                placeholder="you@example.com"
-                                className="w-full px-5 py-4 rounded-2xl border border-slate-200 focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 outline-none transition-all text-slate-900 placeholder:text-slate-300"
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <div className="flex justify-between items-center px-1">
-                                <label className="text-sm font-bold text-slate-700">Password</label>
-                                <button type="button" className="text-xs font-bold text-indigo-600 hover:underline">Forgot Password?</button>
-                            </div>
-                            <input
-                                type="password"
-                                placeholder="••••••••"
-                                className="w-full px-5 py-4 rounded-2xl border border-slate-200 focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 outline-none transition-all text-slate-900 placeholder:text-slate-300"
-                            />
-                        </div>
-
-                        <button type="submit" className="w-full py-5 bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-black text-lg rounded-2xl shadow-xl shadow-indigo-100 hover:scale-[1.02] active:scale-[0.98] transition-all">
-                            Login
-                        </button>
-
-                        <div className="relative py-4 flex items-center gap-4">
-                            <div className="flex-1 h-[1px] bg-slate-100"></div>
-                            <span className="text-xs font-bold text-slate-300 uppercase tracking-widest">or continue with</span>
-                            <div className="flex-1 h-[1px] bg-slate-100"></div>
-                        </div>
+                    <form onSubmit={handleAuth} className="space-y-4">
+                        {!isLogin && (
+                            <AuthInput icon={<User size={18} />} placeholder="Full Name" type="text" value={name} onChange={setName} />
+                        )}
+                        <AuthInput icon={<Mail size={18} />} placeholder="University Email" type="email" value={email} onChange={setEmail} />
+                        <AuthInput icon={<Lock size={18} />} placeholder="Secure Password" type="password" value={password} onChange={setPassword} />
 
                         <button
-                            onClick={handleGoogleLogin}
-                            className="flex items-center justify-center gap-3 w-full py-4 bg-white text-black font-bold rounded-2xl hover:bg-[#F5F0E8] transition-all"
+                            type="submit"
+                            disabled={loading}
+                            className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-bold flex items-center justify-center gap-2 transition-all group shadow-lg shadow-blue-600/20"
                         >
-                            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/layout/google.svg" className="w-5 h-5" alt="Google" />
-                            Continue with Google
+                            {loading ? 'Processing...' : (isLogin ? 'Sync Identity' : 'Create Profile')}
+                            <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                         </button>
                     </form>
 
-                    <p className="mt-10 text-center text-sm font-medium text-slate-400">
-                        Don't have an account? <button className="text-indigo-600 font-black hover:underline ml-1">Sign up</button>
+                    <div className="relative">
+                        <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-white/5"></span></div>
+                        <div className="relative flex justify-center text-[10px] uppercase font-black tracking-widest text-[#F5F0E8]/20 bg-transparent px-2">Or continue with</div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <SocialButton
+                            icon={<FaGoogle size={18} />}
+                            label="Google"
+                            onClick={() => handleSocialLogin(googleProvider)}
+                        />
+                        <SocialButton
+                            icon={<FaGithub size={18} />}
+                            label="GitHub"
+                            onClick={() => handleSocialLogin(githubProvider)}
+                        />
+                    </div>
+
+                    <p className="text-center text-sm text-[#F5F0E8]/40">
+                        {isLogin ? "Don't have an account?" : "Already a member?"}
+                        <button onClick={() => setIsLogin(!isLogin)} className="ml-2 text-blue-400 font-bold hover:underline">
+                            {isLogin ? 'Sign Up' : 'Log In'}
+                        </button>
                     </p>
                 </div>
-            </section>
+
+                {/* Right Side: Visual Brand */}
+                <div className="hidden lg:flex bg-[#0A1628]/60 border-l border-white/5 relative items-center justify-center p-12 overflow-hidden">
+                    <div className="space-y-6 relative z-10 text-center">
+                        <div className="w-24 h-24 bg-blue-600/20 rounded-3xl border border-blue-500/30 flex items-center justify-center mx-auto mb-8 shadow-inner animate-pulse">
+                            <Sparkles size={48} className="text-blue-400" />
+                        </div>
+                        <h2 className="text-3xl font-black text-white">The future of study starts here.</h2>
+                        <p className="text-[#F5F0E8]/40 text-sm max-w-xs mx-auto leading-relaxed">
+                            Quantify your mastery, automate your schedule, and unleash your academic potential with StudentOS.
+                        </p>
+                    </div>
+                    {/* Abstract decoration */}
+                    <div className="absolute inset-0 opacity-20 pointer-events-none bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-blue-500/20 via-transparent to-transparent" />
+                </div>
+            </div>
         </main>
     );
 }
 
-// Helper Component for Features
-function FeatureRow({ icon, title, desc }) {
+// Helper Components
+function AuthInput({ icon, placeholder, type, value, onChange }) {
     return (
-        <div className="flex gap-5 items-start">
-            <div className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center text-2xl border border-slate-50">
+        <div className="relative group">
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-blue-400 transition-colors">
                 {icon}
             </div>
-            <div>
-                <h3 className="font-bold text-slate-900 text-lg">{title}</h3>
-                <p className="text-slate-500 font-medium leading-snug">{desc}</p>
-            </div>
+            <input
+                required
+                type={type}
+                placeholder={placeholder}
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 p-4 pl-12 rounded-2xl text-sm font-medium text-white focus:outline-none focus:border-blue-500/50 focus:bg-white/10 transition-all placeholder:text-white/10"
+            />
         </div>
+    );
+}
+
+function SocialButton({ icon, label, onClick }) {
+    return (
+        <button
+            onClick={onClick}
+            className="flex items-center justify-center gap-3 py-3 bg-white/5 border border-white/10 rounded-2xl text-sm font-bold text-white hover:bg-white/10 transition-all"
+        >
+            {icon} {label}
+        </button>
     );
 }
