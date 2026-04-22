@@ -82,59 +82,102 @@ function TaskCard({ task, isActive, onComplete, onExpand, expanded }) {
 
     if (isBreak) {
         return (
-            <div style={{
-                margin: "6px 0", padding: "10px 18px",
-                borderRadius: 100, background: "rgba(16,185,129,0.06)",
-                border: `1px solid rgba(16,185,129,0.2)`,
-                display: "flex", alignItems: "center", gap: 10,
-                cursor: "pointer", transition: "all 0.2s",
-            }} onClick={() => onComplete(task.id)}>
+            <div
+                className="my-1.5 px-[18px] py-2.5 rounded-full flex items-center gap-2.5 cursor-pointer transition-all"
+                style={{
+                    background: "rgba(16,185,129,0.06)",
+                    border: "1px solid rgba(16,185,129,0.2)",
+                }}
+                onClick={() => onComplete(task.id)}
+            >
                 <Coffee size={14} color={C.success} />
-                <span style={{ fontSize: 13, color: C.success, fontWeight: 600 }}>{task.title}</span>
-                <span style={{ fontSize: 11, color: C.muted, fontFamily: "monospace", marginLeft: "auto" }}>{task.time} – {task.end}</span>
+                <span className="text-[13px] font-semibold" style={{ color: C.success }}>{task.title}</span>
+                <span className="text-[11px] font-mono ml-auto" style={{ color: C.muted }}>{task.time} – {task.end}</span>
             </div>
         );
     }
 
     return (
-        <div style={{
-            marginBottom: 10, borderRadius: 14,
-            background: isActive ? `rgba(12,45,94,0.7)` : `rgba(12,45,94,0.4)`,
-            border: `1px solid ${isActive ? ts.border : C.border}`,
-            boxShadow: isActive ? `0 0 20px ${ts.glow}, inset 0 1px 0 rgba(255,255,255,0.04)` : "none",
-            transition: "all 0.25s ease",
-            opacity: task.completed ? 0.45 : 1,
-            overflow: "hidden",
-        }}>
+        <div
+            className="mb-2.5 rounded-[14px] overflow-hidden transition-all duration-[250ms] ease-in-out"
+            style={{
+                background: isActive ? "rgba(12,45,94,0.7)" : "rgba(12,45,94,0.4)",
+                border: `1px solid ${isActive ? ts.border : C.border}`,
+                boxShadow: isActive ? `0 0 20px ${ts.glow}, inset 0 1px 0 rgba(255,255,255,0.04)` : "none",
+                opacity: task.completed ? 0.45 : 1,
+            }}
+        >
             {/* Card header */}
-            <div style={{ padding: "14px 16px", cursor: "pointer" }} onClick={() => onExpand(task.id)}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                            <div style={{ width: 8, height: 8, borderRadius: "50%", background: CATEGORY_COLORS[task.category] || C.muted, flexShrink: 0 }} />
-                            <span style={{ fontSize: 9, color: CATEGORY_COLORS[task.category] || C.muted, fontFamily: "monospace", letterSpacing: "0.1em", textTransform: "uppercase" }}>{task.category}</span>
-                            {task.type === "ai" && <span style={{ fontSize: 9, color: C.muted, fontFamily: "monospace", border: `1px dashed ${C.border}`, padding: "1px 6px", borderRadius: 4 }}>AI</span>}
+            <div className="p-4 cursor-pointer" onClick={() => onExpand(task.id)}>
+                <div className="flex justify-between items-start mb-2">
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                            <div
+                                className="w-2 h-2 rounded-full shrink-0"
+                                style={{ background: CATEGORY_COLORS[task.category] || C.muted }}
+                            />
+                            <span
+                                className="text-[9px] font-mono tracking-[0.1em] uppercase"
+                                style={{ color: CATEGORY_COLORS[task.category] || C.muted }}
+                            >
+                                {task.category}
+                            </span>
+                            {task.type === "ai" && (
+                                <span
+                                    className="text-[9px] font-mono px-1.5 py-px rounded"
+                                    style={{ color: C.muted, border: `1px dashed ${C.border}` }}
+                                >
+                                    AI
+                                </span>
+                            )}
                         </div>
-                        <h4 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: task.completed ? C.muted : C.white, textDecoration: task.completed ? "line-through" : "none", letterSpacing: "-0.01em" }}>{task.title}</h4>
-                        <p style={{ fontSize: 11, color: C.muted, fontFamily: "monospace", margin: "4px 0 0" }}>{task.time} – {task.end} &nbsp;·&nbsp; Energy: {task.energy}</p>
+                        <h4
+                            className="text-[14px] font-bold m-0 tracking-[-0.01em]"
+                            style={{
+                                color: task.completed ? C.muted : C.white,
+                                textDecoration: task.completed ? "line-through" : "none",
+                            }}
+                        >
+                            {task.title}
+                        </h4>
+                        <p className="text-[11px] font-mono mt-1 mb-0" style={{ color: C.muted }}>
+                            {task.time} – {task.end} &nbsp;·&nbsp; Energy: {task.energy}
+                        </p>
                     </div>
-                    <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 12 }}>
-                        <div style={{ fontSize: 11, color: confidenceColor(task.confidence), fontFamily: "monospace", fontWeight: 700 }}>{task.confidence}% confidence</div>
-                        <div style={{ marginTop: 4, height: 3, width: 60, background: "rgba(255,255,255,0.08)", borderRadius: 2, overflow: "hidden" }}>
-                            <div style={{ height: "100%", width: `${task.confidence}%`, background: confidenceColor(task.confidence), borderRadius: 2 }} />
+                    <div className="text-right shrink-0 ml-3">
+                        <div className="text-[11px] font-mono font-bold" style={{ color: confidenceColor(task.confidence) }}>
+                            {task.confidence}% confidence
+                        </div>
+                        <div className="mt-1 h-[3px] w-[60px] rounded-sm overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
+                            <div
+                                className="h-full rounded-sm"
+                                style={{ width: `${task.confidence}%`, background: confidenceColor(task.confidence) }}
+                            />
                         </div>
                     </div>
                 </div>
 
                 {/* Action buttons */}
-                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                    <button onClick={e => { e.stopPropagation(); }} style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 12px", borderRadius: 8, background: C.accent, border: "none", color: C.white, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                <div className="flex gap-2 mt-2">
+                    <button
+                        onClick={e => { e.stopPropagation(); }}
+                        className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-semibold cursor-pointer border-none text-white"
+                        style={{ background: C.accent }}
+                    >
                         <Play size={10} fill="currentColor" /> Launch
                     </button>
-                    <button onClick={e => { e.stopPropagation(); }} style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 12px", borderRadius: 8, background: "transparent", border: `1px solid ${C.border}`, color: C.muted, fontSize: 11, cursor: "pointer" }}>
+                    <button
+                        onClick={e => { e.stopPropagation(); }}
+                        className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-transparent text-[11px] cursor-pointer"
+                        style={{ border: `1px solid ${C.border}`, color: C.muted }}
+                    >
                         <Move size={10} /> Move
                     </button>
-                    <button onClick={e => { e.stopPropagation(); onComplete(task.id); }} style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 12px", borderRadius: 8, background: "transparent", border: `1px solid ${C.border}`, color: C.muted, fontSize: 11, cursor: "pointer" }}>
+                    <button
+                        onClick={e => { e.stopPropagation(); onComplete(task.id); }}
+                        className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-transparent text-[11px] cursor-pointer"
+                        style={{ border: `1px solid ${C.border}`, color: C.muted }}
+                    >
                         <CheckCircle2 size={10} /> Complete
                     </button>
                 </div>
@@ -142,12 +185,21 @@ function TaskCard({ task, isActive, onComplete, onExpand, expanded }) {
 
             {/* Expanded subtasks */}
             {expanded && task.subtasks.length > 0 && (
-                <div style={{ padding: "0 16px 14px", borderTop: `1px solid ${C.border}` }}>
-                    <p style={{ fontSize: 9, color: C.muted, fontFamily: "monospace", letterSpacing: "0.15em", textTransform: "uppercase", margin: "12px 0 8px" }}>Subtasks</p>
+                <div className="px-4 pb-3.5" style={{ borderTop: `1px solid ${C.border}` }}>
+                    <p className="text-[9px] font-mono tracking-[0.15em] uppercase mt-3 mb-2" style={{ color: C.muted }}>
+                        Subtasks
+                    </p>
                     {task.subtasks.map((s, i) => (
-                        <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", borderBottom: i < task.subtasks.length - 1 ? `1px solid ${C.dim}` : "none" }}>
-                            <div style={{ width: 14, height: 14, borderRadius: "50%", border: `1.5px solid ${C.border}`, flexShrink: 0 }} />
-                            <span style={{ fontSize: 12, color: C.muted }}>{s}</span>
+                        <div
+                            key={i}
+                            className="flex items-center gap-2 py-[5px]"
+                            style={{ borderBottom: i < task.subtasks.length - 1 ? `1px solid ${C.dim}` : "none" }}
+                        >
+                            <div
+                                className="w-3.5 h-3.5 rounded-full shrink-0"
+                                style={{ border: `1.5px solid ${C.border}` }}
+                            />
+                            <span className="text-[12px]" style={{ color: C.muted }}>{s}</span>
                         </div>
                     ))}
                 </div>
@@ -160,7 +212,6 @@ function TaskCard({ task, isActive, onComplete, onExpand, expanded }) {
 function CalendarView({ tasks }) {
     const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
     const today = new Date().getDay();
-    // Sample week data
     const weekTasks = {
         1: tasks.slice(0, 3),
         2: tasks.slice(1, 4),
@@ -172,21 +223,45 @@ function CalendarView({ tasks }) {
     };
 
     return (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6, height: "100%", padding: "0 4px" }}>
+        <div className="grid grid-cols-7 gap-1.5 h-full px-1">
             {days.map((day, i) => {
                 const dayNum = i + 1;
                 const isToday = dayNum === (today === 0 ? 7 : today);
                 const dayTasks = weekTasks[dayNum] || [];
                 return (
-                    <div key={day} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                        <div style={{ textAlign: "center", padding: "6px 0", marginBottom: 4 }}>
-                            <p style={{ fontSize: 9, color: isToday ? C.gold : C.muted, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: "0.1em", margin: 0 }}>{day}</p>
-                            {isToday && <div style={{ width: 4, height: 4, borderRadius: "50%", background: C.gold, margin: "3px auto 0" }} />}
+                    <div key={day} className="flex flex-col gap-1">
+                        <div className="text-center py-1.5 mb-1">
+                            <p
+                                className="text-[9px] font-mono uppercase tracking-[0.1em] m-0"
+                                style={{ color: isToday ? C.gold : C.muted }}
+                            >
+                                {day}
+                            </p>
+                            {isToday && (
+                                <div
+                                    className="w-1 h-1 rounded-full mx-auto mt-[3px]"
+                                    style={{ background: C.gold }}
+                                />
+                            )}
                         </div>
                         {dayTasks.map((t, ti) => (
-                            <div key={ti} style={{ padding: "5px 6px", borderRadius: 7, background: `${CATEGORY_COLORS[t.category]}18`, border: `1px solid ${CATEGORY_COLORS[t.category]}35`, cursor: "pointer" }}>
-                                <p style={{ fontSize: 9, color: CATEGORY_COLORS[t.category], fontWeight: 600, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.title}</p>
-                                <p style={{ fontSize: 8, color: C.dim, fontFamily: "monospace", margin: "2px 0 0" }}>{t.time}</p>
+                            <div
+                                key={ti}
+                                className="px-1.5 py-[5px] rounded-[7px] cursor-pointer"
+                                style={{
+                                    background: `${CATEGORY_COLORS[t.category]}18`,
+                                    border: `1px solid ${CATEGORY_COLORS[t.category]}35`,
+                                }}
+                            >
+                                <p
+                                    className="text-[9px] font-semibold m-0 overflow-hidden text-ellipsis whitespace-nowrap"
+                                    style={{ color: CATEGORY_COLORS[t.category] }}
+                                >
+                                    {t.title}
+                                </p>
+                                <p className="text-[8px] font-mono mt-0.5 mb-0" style={{ color: C.dim }}>
+                                    {t.time}
+                                </p>
                             </div>
                         ))}
                     </div>
@@ -207,18 +282,16 @@ function VectorView({ tasks }) {
     }));
 
     return (
-        <div style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}>
-            <svg width="100%" height="100%" style={{ position: "absolute", inset: 0 }}>
-                {/* Neural connections */}
+        <div className="relative w-full h-full overflow-hidden">
+            <svg width="100%" height="100%" className="absolute inset-0">
                 {nodes.map((n, i) =>
                     nodes.slice(i + 1, i + 3).map((m, j) => (
                         <line key={`${i}-${j}`} x1={n.x} y1={n.y} x2={m.x} y2={m.y}
                             stroke="rgba(24,95,165,0.15)" strokeWidth="1" strokeDasharray="3 4" />
                     ))
                 )}
-                {/* Nodes */}
                 {nodes.map((n) => (
-                    <g key={n.id} onMouseEnter={() => setHovered(n)} onMouseLeave={() => setHovered(null)} style={{ cursor: "pointer" }}>
+                    <g key={n.id} onMouseEnter={() => setHovered(n)} onMouseLeave={() => setHovered(null)} className="cursor-pointer">
                         <circle cx={n.x} cy={n.y} r={n.r + 4} fill={`${CATEGORY_COLORS[n.category]}10`} />
                         <circle cx={n.x} cy={n.y} r={n.r} fill={CATEGORY_COLORS[n.category]} fillOpacity={0.85} />
                         {hovered?.id === n.id && (
@@ -229,30 +302,43 @@ function VectorView({ tasks }) {
                 ))}
             </svg>
 
-            {/* Hover tooltip */}
+            {/* Hover tooltip — position is dynamic so stays inline */}
             {hovered && (
-                <div style={{
-                    position: "absolute", left: hovered.x + 15, top: hovered.y - 20,
-                    background: C.primary, border: `1px solid ${C.border}`,
-                    borderRadius: 10, padding: "10px 14px", pointerEvents: "none",
-                    zIndex: 10, minWidth: 160,
-                    boxShadow: `0 8px 24px rgba(0,0,0,0.4)`,
-                }}>
-                    <p style={{ fontSize: 12, fontWeight: 700, color: C.white, margin: "0 0 4px" }}>{hovered.title}</p>
-                    <p style={{ fontSize: 10, color: C.muted, fontFamily: "monospace", margin: 0 }}>{hovered.time} · {hovered.energy} energy</p>
-                    <div style={{ marginTop: 6, display: "flex", gap: 6 }}>
-                        <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 4, background: `${CATEGORY_COLORS[hovered.category]}20`, color: CATEGORY_COLORS[hovered.category], fontFamily: "monospace" }}>{hovered.category}</span>
-                        <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 4, background: "rgba(255,255,255,0.05)", color: confidenceColor(hovered.confidence), fontFamily: "monospace" }}>{hovered.confidence}%</span>
+                <div
+                    className="absolute pointer-events-none z-10 rounded-[10px] p-[10px_14px] min-w-[160px]"
+                    style={{
+                        left: hovered.x + 15,
+                        top: hovered.y - 20,
+                        background: C.primary,
+                        border: `1px solid ${C.border}`,
+                        boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+                    }}
+                >
+                    <p className="text-[12px] font-bold mb-1 m-0" style={{ color: C.white }}>{hovered.title}</p>
+                    <p className="text-[10px] font-mono m-0" style={{ color: C.muted }}>{hovered.time} · {hovered.energy} energy</p>
+                    <div className="flex gap-1.5 mt-1.5">
+                        <span
+                            className="text-[9px] font-mono px-[7px] py-0.5 rounded"
+                            style={{ background: `${CATEGORY_COLORS[hovered.category]}20`, color: CATEGORY_COLORS[hovered.category] }}
+                        >
+                            {hovered.category}
+                        </span>
+                        <span
+                            className="text-[9px] font-mono px-[7px] py-0.5 rounded"
+                            style={{ background: "rgba(255,255,255,0.05)", color: confidenceColor(hovered.confidence) }}
+                        >
+                            {hovered.confidence}%
+                        </span>
                     </div>
                 </div>
             )}
 
             {/* Legend */}
-            <div style={{ position: "absolute", bottom: 12, left: 12, display: "flex", gap: 12 }}>
+            <div className="absolute bottom-3 left-3 flex gap-3">
                 {Object.entries(CATEGORY_COLORS).map(([cat, col]) => (
-                    <div key={cat} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                        <div style={{ width: 7, height: 7, borderRadius: "50%", background: col }} />
-                        <span style={{ fontSize: 9, color: C.muted, fontFamily: "monospace" }}>{cat}</span>
+                    <div key={cat} className="flex items-center gap-1.5">
+                        <div className="w-[7px] h-[7px] rounded-full" style={{ background: col }} />
+                        <span className="text-[9px] font-mono" style={{ color: C.muted }}>{cat}</span>
                     </div>
                 ))}
             </div>
@@ -263,7 +349,7 @@ function VectorView({ tasks }) {
 // ── MAIN PAGE ─────────────────────────────────────────────────────────────────
 export default function PlannerPage() {
     const [tasks, setTasks] = useState(INITIAL_TASKS);
-    const [activeView, setActiveView] = useState("timeline"); // timeline | calendar | vector
+    const [activeView, setActiveView] = useState("timeline");
     const [expandedId, setExpandedId] = useState(null);
     const [suggestions, setSuggestions] = useState(AI_SUGGESTIONS);
     const [aiLogs, setAiLogs] = useState([]);
@@ -274,6 +360,7 @@ export default function PlannerPage() {
     const [addingTask, setAddingTask] = useState(false);
     const [newTask, setNewTask] = useState({ title: "", time: "", energy: "Medium", category: "Study" });
     const logRef = useRef(null);
+    const chatRef = useRef(null);
 
     const [chatMessages, setChatMessages] = useState([
         { role: "ai", text: "Analyzing workload distribution...", suggestion: null },
@@ -298,6 +385,11 @@ export default function PlannerPage() {
             }, 800 + i * 600);
         });
     }, []);
+
+    // Auto-scroll chat
+    useEffect(() => {
+        if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
+    }, [chatMessages]);
 
     const handleComplete = (id) => {
         setTasks(prev => prev.map(t => t.id === id ? { ...t, completed: true } : t));
@@ -356,7 +448,7 @@ export default function PlannerPage() {
     // Stats
     const totalPlanned = tasks.reduce((s, t) => s + (timeToMinutes(t.end) - timeToMinutes(t.time)), 0);
     const completedCount = tasks.filter(t => t.completed).length;
-    const availableMinutes = 18 * 60; // 6am-midnight
+    const availableMinutes = 18 * 60;
     const remainingMinutes = availableMinutes - totalPlanned;
 
     // Timeline: hours 8–20
@@ -370,8 +462,10 @@ export default function PlannerPage() {
     const FOCUS_MODES = ["Deep Work", "Exam Mode", "Recovery", "Balanced"];
 
     return (
-        <div style={{ display: "flex", minHeight: "100vh", background: C.bg, color: C.white, fontFamily: "'DM Sans', 'Inter', sans-serif", overflow: "hidden" }}>
-
+        <div
+            className="flex min-h-screen overflow-hidden text-white"
+            style={{ background: C.bg, fontFamily: "'DM Sans', 'Inter', sans-serif" }}
+        >
             <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap');
                 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
@@ -392,146 +486,225 @@ export default function PlannerPage() {
             `}</style>
 
             {/* ── SHARED SIDEBAR ── */}
-            <Sidebar activePage="planner" style="marginLeft: 0" />
+            <Sidebar activePage="planner" />
 
             {/* ── MAIN AREA ── */}
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden", marginLeft: 256 }}>
+            <div className="flex flex-col flex-1 min-w-0 overflow-hidden ml-64">
 
                 {/* Top Bar */}
-                <header style={{ padding: "12px 20px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 16, background: `rgba(10,22,40,0.8)`, backdropFilter: "blur(12px)", flexShrink: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0, letterSpacing: "-0.01em" }}>Today's Timeline</h2>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", background: "rgba(201,168,76,0.1)", border: `1px solid ${C.borderGold}`, borderRadius: 100 }}>
+                <header
+                    className="flex items-center gap-4 px-5 py-3 shrink-0 backdrop-blur-[12px]"
+                    style={{ borderBottom: `1px solid ${C.border}`, background: "rgba(10,22,40,0.8)" }}
+                >
+                    <div className="flex items-center gap-2.5">
+                        <h2 className="text-[15px] font-bold m-0 tracking-[-0.01em]">Today's Timeline</h2>
+                        <div
+                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full"
+                            style={{ background: "rgba(201,168,76,0.1)", border: `1px solid ${C.borderGold}` }}
+                        >
                             <Clock size={11} color={C.gold} />
-                            <span style={{ fontSize: 11, color: C.gold, fontFamily: "DM Mono" }}>{getCurrentTimeStr()}</span>
+                            <span className="text-[11px] font-[DM_Mono,monospace]" style={{ color: C.gold }}>{getCurrentTimeStr()}</span>
                         </div>
                     </div>
 
-                    {/* Time Budget in header */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 16, marginLeft: 8 }}>
+                    {/* Time Budget */}
+                    <div className="flex items-center gap-4 ml-2">
                         {[
                             { label: "Available", val: "9h", color: C.muted },
                             { label: "Planned", val: `${Math.floor(totalPlanned / 60)}h ${totalPlanned % 60}m`, color: C.gold },
                             { label: "Free", val: `${Math.floor(remainingMinutes / 60)}h ${remainingMinutes % 60}m`, color: C.success },
                         ].map(r => (
-                            <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                                <span style={{ fontSize: 10, color: C.dim, fontFamily: "DM Mono" }}>{r.label}:</span>
-                                <span style={{ fontSize: 11, color: r.color, fontFamily: "DM Mono", fontWeight: 600 }}>{r.val}</span>
+                            <div key={r.label} className="flex items-center gap-1">
+                                <span className="text-[10px] font-mono" style={{ color: C.dim }}>{r.label}:</span>
+                                <span className="text-[11px] font-mono font-semibold" style={{ color: r.color }}>{r.val}</span>
                             </div>
                         ))}
                     </div>
 
                     {/* View switcher */}
-                    <div style={{ display: "flex", gap: 4, background: `rgba(12,45,94,0.5)`, padding: 4, borderRadius: 10, border: `1px solid ${C.border}`, marginLeft: "auto" }}>
+                    <div
+                        className="flex gap-1 p-1 rounded-[10px] ml-auto"
+                        style={{ background: "rgba(12,45,94,0.5)", border: `1px solid ${C.border}` }}
+                    >
                         {[
                             { key: "timeline", icon: <Activity size={13} />, label: "Timeline" },
                             { key: "calendar", icon: <Calendar size={13} />, label: "Calendar" },
                             { key: "vector", icon: <BarChart2 size={13} />, label: "Vector" },
                         ].map(v => (
-                            <button key={v.key} className="view-btn" onClick={() => setActiveView(v.key)} style={{
-                                display: "flex", alignItems: "center", gap: 5, padding: "5px 12px",
-                                borderRadius: 7, border: "none", cursor: "pointer", fontSize: 11, fontWeight: 600,
-                                transition: "all 0.2s", fontFamily: "DM Mono",
-                                background: activeView === v.key ? C.accent : "transparent",
-                                color: activeView === v.key ? C.white : C.muted,
-                            }}>
+                            <button
+                                key={v.key}
+                                className="view-btn flex items-center gap-1.5 px-3 py-[5px] rounded-[7px] border-none cursor-pointer text-[11px] font-semibold transition-all duration-200 font-mono"
+                                onClick={() => setActiveView(v.key)}
+                                style={{
+                                    background: activeView === v.key ? C.accent : "transparent",
+                                    color: activeView === v.key ? C.white : C.muted,
+                                }}
+                            >
                                 {v.icon} {v.label}
                             </button>
                         ))}
                     </div>
 
-                    <button onClick={() => setAddingTask(true)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 14px", background: `rgba(201,168,76,0.1)`, border: `1px solid ${C.borderGold}`, borderRadius: 10, color: C.gold, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                    <button
+                        onClick={() => setAddingTask(true)}
+                        className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-[10px] text-[11px] font-bold cursor-pointer"
+                        style={{ background: "rgba(201,168,76,0.1)", border: `1px solid ${C.borderGold}`, color: C.gold }}
+                    >
                         <Plus size={13} /> Add Task
                     </button>
                 </header>
 
                 {/* Add Task Modal */}
                 {addingTask && (
-                    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <div style={{ background: C.primary, border: `1px solid ${C.border}`, borderRadius: 16, padding: 24, width: 360 }}>
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>New Task</h3>
-                                <button onClick={() => setAddingTask(false)} style={{ background: "none", border: "none", color: C.muted, cursor: "pointer" }}><X size={16} /></button>
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.6)" }}>
+                        <div
+                            className="rounded-2xl p-6 w-[360px]"
+                            style={{ background: C.primary, border: `1px solid ${C.border}` }}
+                        >
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="m-0 text-[15px] font-bold">New Task</h3>
+                                <button
+                                    onClick={() => setAddingTask(false)}
+                                    className="bg-transparent border-none cursor-pointer"
+                                    style={{ color: C.muted }}
+                                >
+                                    <X size={16} />
+                                </button>
                             </div>
+
                             {[
                                 { label: "Title", field: "title", type: "text", placeholder: "Task name..." },
                                 { label: "Time", field: "time", type: "time", placeholder: "09:00" },
                             ].map(f => (
-                                <div key={f.field} style={{ marginBottom: 12 }}>
-                                    <label style={{ fontSize: 10, color: C.muted, fontFamily: "DM Mono", textTransform: "uppercase", letterSpacing: "0.1em", display: "block", marginBottom: 4 }}>{f.label}</label>
-                                    <input type={f.type} value={newTask[f.field]} onChange={e => setNewTask(p => ({ ...p, [f.field]: e.target.value }))} placeholder={f.placeholder}
-                                        style={{ width: "100%", padding: "8px 12px", background: "rgba(10,22,40,0.8)", border: `1px solid ${C.border}`, borderRadius: 8, color: C.white, fontSize: 13, outline: "none", boxSizing: "border-box", fontFamily: "DM Mono" }} />
+                                <div key={f.field} className="mb-3">
+                                    <label
+                                        className="text-[10px] font-mono uppercase tracking-[0.1em] block mb-1"
+                                        style={{ color: C.muted }}
+                                    >
+                                        {f.label}
+                                    </label>
+                                    <input
+                                        type={f.type}
+                                        value={newTask[f.field]}
+                                        onChange={e => setNewTask(p => ({ ...p, [f.field]: e.target.value }))}
+                                        placeholder={f.placeholder}
+                                        className="w-full px-3 py-2 rounded-lg text-[13px] outline-none font-mono box-border"
+                                        style={{
+                                            background: "rgba(10,22,40,0.8)",
+                                            border: `1px solid ${C.border}`,
+                                            color: C.white,
+                                        }}
+                                    />
                                 </div>
                             ))}
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
+
+                            <div className="grid grid-cols-2 gap-2.5 mb-4">
                                 {[
                                     { label: "Energy", field: "energy", opts: ["Low", "Medium", "High"] },
                                     { label: "Category", field: "category", opts: Object.keys(CATEGORY_COLORS) },
                                 ].map(f => (
                                     <div key={f.field}>
-                                        <label style={{ fontSize: 10, color: C.muted, fontFamily: "DM Mono", textTransform: "uppercase", letterSpacing: "0.1em", display: "block", marginBottom: 4 }}>{f.label}</label>
-                                        <select value={newTask[f.field]} onChange={e => setNewTask(p => ({ ...p, [f.field]: e.target.value }))}
-                                            style={{ width: "100%", padding: "8px 10px", background: "rgba(10,22,40,0.8)", border: `1px solid ${C.border}`, borderRadius: 8, color: C.white, fontSize: 12, outline: "none", fontFamily: "DM Mono" }}>
+                                        <label
+                                            className="text-[10px] font-mono uppercase tracking-[0.1em] block mb-1"
+                                            style={{ color: C.muted }}
+                                        >
+                                            {f.label}
+                                        </label>
+                                        <select
+                                            value={newTask[f.field]}
+                                            onChange={e => setNewTask(p => ({ ...p, [f.field]: e.target.value }))}
+                                            className="w-full px-2.5 py-2 rounded-lg text-[12px] outline-none font-mono"
+                                            style={{
+                                                background: "rgba(10,22,40,0.8)",
+                                                border: `1px solid ${C.border}`,
+                                                color: C.white,
+                                            }}
+                                        >
                                             {f.opts.map(o => <option key={o} value={o}>{o}</option>)}
                                         </select>
                                     </div>
                                 ))}
                             </div>
-                            <button onClick={handleAddTask} style={{ width: "100%", padding: "10px", background: C.accent, border: "none", borderRadius: 10, color: C.white, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Add to Timeline</button>
+
+                            <button
+                                onClick={handleAddTask}
+                                className="w-full py-2.5 rounded-[10px] border-none text-white text-[13px] font-bold cursor-pointer"
+                                style={{ background: C.accent }}
+                            >
+                                Add to Timeline
+                            </button>
                         </div>
                     </div>
                 )}
 
                 {/* Main Content */}
-                <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+                <div className="flex flex-1 overflow-hidden">
 
                     {/* ── TIMELINE / CALENDAR / VECTOR ── */}
-                    <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px", minWidth: 0 }}>
+                    <div className="flex-1 overflow-y-auto px-5 py-4 min-w-0">
 
                         {activeView === "timeline" && (
-                            <div style={{ position: "relative" }}>
-                                {/* Now scanner beam */}
-                                <div style={{
-                                    position: "absolute", left: 0, right: 0,
-                                    top: `${nowPct}%`,
-                                    height: 1, background: `linear-gradient(90deg, transparent, ${C.gold}, transparent)`,
-                                    zIndex: 5, animation: "scanDown 3s ease-in-out infinite",
-                                }}>
-                                    <div style={{ position: "absolute", left: 0, top: -8, fontSize: 9, color: C.gold, fontFamily: "DM Mono", background: C.bg, padding: "1px 6px", borderRadius: 4 }}>NOW</div>
+                            <div className="relative">
+                                {/* Now scanner beam — top% is dynamic */}
+                                <div
+                                    className="absolute left-0 right-0 z-[5]"
+                                    style={{
+                                        top: `${nowPct}%`,
+                                        height: 1,
+                                        background: `linear-gradient(90deg, transparent, ${C.gold}, transparent)`,
+                                        animation: "scanDown 3s ease-in-out infinite",
+                                    }}
+                                >
+                                    <div
+                                        className="absolute left-0 text-[9px] font-mono px-1.5 py-px rounded"
+                                        style={{ top: -8, color: C.gold, background: C.bg }}
+                                    >
+                                        NOW
+                                    </div>
                                 </div>
 
-                                {/* Hour ticks */}
+                                {/* Hour ticks — top% is dynamic */}
                                 {HOURS.map(h => {
                                     const pct = ((h * 60 - TIMELINE_START) / TIMELINE_RANGE) * 100;
                                     return (
-                                        <div key={h} style={{ position: "absolute", left: 0, top: `${pct}%`, width: "100%", pointerEvents: "none", zIndex: 0 }}>
-                                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                                <span style={{ fontSize: 9, color: C.dim, fontFamily: "DM Mono", width: 32, flexShrink: 0 }}>{String(h).padStart(2, "0")}:00</span>
-                                                <div style={{ flex: 1, height: 1, background: "rgba(24,95,165,0.08)" }} />
+                                        <div
+                                            key={h}
+                                            className="absolute left-0 w-full pointer-events-none z-0"
+                                            style={{ top: `${pct}%` }}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <span
+                                                    className="text-[9px] font-mono w-8 shrink-0"
+                                                    style={{ color: C.dim }}
+                                                >
+                                                    {String(h).padStart(2, "0")}:00
+                                                </span>
+                                                <div className="flex-1 h-px" style={{ background: "rgba(24,95,165,0.08)" }} />
                                             </div>
                                         </div>
                                     );
                                 })}
 
                                 {/* Task blocks */}
-                                <div style={{ paddingLeft: 44, paddingTop: 8, minHeight: 600, position: "relative" }}>
+                                <div className="pl-11 pt-2 min-h-[600px] relative">
                                     {tasks
                                         .slice()
                                         .sort((a, b) => a.time.localeCompare(b.time))
                                         .map((task, i) => {
-                                            const startMin = timeToMinutes(task.time) - TIMELINE_START;
-                                            const durMin = timeToMinutes(task.end) - timeToMinutes(task.time);
                                             const isActive = nowMinutes >= timeToMinutes(task.time) && nowMinutes < timeToMinutes(task.end);
                                             return (
-                                                <div key={task.id} className="task-anim" style={{
-                                                    marginBottom: 8,
-                                                    animationDelay: `${i * 0.05}s`,
-                                                }}>
-                                                    <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-                                                        <div style={{ width: 44, flexShrink: 0, paddingTop: 16, textAlign: "right" }}>
-                                                            <span style={{ fontSize: 9, color: "rgba(245,240,232,0.15)", fontFamily: "DM Mono" }}>{task.time}</span>
+                                                <div
+                                                    key={task.id}
+                                                    className="task-anim mb-2"
+                                                    style={{ animationDelay: `${i * 0.05}s` }}
+                                                >
+                                                    <div className="flex gap-3 items-start">
+                                                        <div className="w-11 shrink-0 pt-4 text-right">
+                                                            <span className="text-[9px] font-mono" style={{ color: "rgba(245,240,232,0.15)" }}>
+                                                                {task.time}
+                                                            </span>
                                                         </div>
-                                                        <div style={{ flex: 1 }}>
+                                                        <div className="flex-1">
                                                             <TaskCard
                                                                 task={task}
                                                                 isActive={isActive}
@@ -549,60 +722,114 @@ export default function PlannerPage() {
                         )}
 
                         {activeView === "calendar" && (
-                            <div style={{ height: "calc(100vh - 120px)" }}>
+                            <div className="h-[calc(100vh-120px)]">
                                 <CalendarView tasks={tasks} />
                             </div>
                         )}
 
                         {activeView === "vector" && (
-                            <div style={{ height: "calc(100vh - 120px)", position: "relative" }}>
+                            <div className="h-[calc(100vh-120px)] relative">
                                 <VectorView tasks={tasks} />
                             </div>
                         )}
                     </div>
 
                     {/* ── AGENT CONSOLE ── */}
-                    <div style={{ width: 300, borderLeft: `1px solid ${C.border}`, display: "flex", flexDirection: "column", background: "rgba(6,13,26,0.85)", flexShrink: 0 }}>
-
+                    <div
+                        className="w-[300px] flex flex-col shrink-0"
+                        style={{ borderLeft: `1px solid ${C.border}`, background: "rgba(6,13,26,0.85)" }}
+                    >
                         {/* Header */}
-                        <div style={{ padding: "14px 16px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div
+                            className="flex justify-between items-center px-4 py-3.5"
+                            style={{ borderBottom: `1px solid ${C.border}` }}
+                        >
                             <div>
-                                <p style={{ fontSize: 8, color: C.muted, fontFamily: "DM Mono", textTransform: "uppercase", letterSpacing: "0.15em", margin: 0 }}>Agent Console</p>
-                                <h3 style={{ fontSize: 13, fontWeight: 700, margin: "2px 0 0" }}>AI Brain</h3>
+                                <p className="text-[8px] font-mono uppercase tracking-[0.15em] m-0" style={{ color: C.muted }}>
+                                    Agent Console
+                                </p>
+                                <h3 className="text-[13px] font-bold mt-0.5 mb-0">AI Brain</h3>
                             </div>
-                            <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 10px", background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.2)", borderRadius: 100 }}>
-                                <div style={{ width: 5, height: 5, borderRadius: "50%", background: C.success, animation: "pulse 1.5s infinite" }} />
-                                <span style={{ fontSize: 9, color: C.success, fontFamily: "DM Mono" }}>Active</span>
+                            <div
+                                className="flex items-center gap-1.5 px-2.5 py-[3px] rounded-full"
+                                style={{ background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.2)" }}
+                            >
+                                <div
+                                    className="w-[5px] h-[5px] rounded-full"
+                                    style={{ background: C.success, animation: "pulse 1.5s infinite" }}
+                                />
+                                <span className="text-[9px] font-mono" style={{ color: C.success }}>Active</span>
                             </div>
                         </div>
 
                         {/* Unified Chat */}
-                        <div style={{ flex: 1, overflowY: "auto", padding: "0 14px 10px", display: "flex", flexDirection: "column", gap: 8 }}>
+                        <div
+                            ref={chatRef}
+                            className="flex-1 overflow-y-auto px-3.5 pb-2.5 flex flex-col gap-2"
+                        >
                             {chatMessages.map((msg, i) => (
                                 <div key={i}>
                                     {msg.role === "user" ? (
-                                        <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                                            <div style={{ padding: "8px 12px", background: `rgba(24,95,165,0.2)`, border: `1px solid ${C.border}`, borderRadius: "12px 12px 4px 12px", maxWidth: "85%" }}>
-                                                <p style={{ fontSize: 11, color: C.white, margin: 0, fontFamily: "DM Mono" }}>{msg.text}</p>
+                                        <div className="flex justify-end">
+                                            <div
+                                                className="px-3 py-2 max-w-[85%]"
+                                                style={{
+                                                    background: "rgba(24,95,165,0.2)",
+                                                    border: `1px solid ${C.border}`,
+                                                    borderRadius: "12px 12px 4px 12px",
+                                                }}
+                                            >
+                                                <p className="text-[11px] font-mono m-0" style={{ color: C.white }}>{msg.text}</p>
                                             </div>
                                         </div>
                                     ) : (
-                                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                                            <div style={{ padding: "8px 12px", background: "rgba(12,45,94,0.4)", border: `1px solid ${C.border}`, borderRadius: "12px 12px 12px 4px" }}>
-                                                <p style={{ fontSize: 11, color: "rgba(245,240,232,0.75)", margin: 0, fontFamily: "DM Mono", lineHeight: 1.5 }}>{msg.text}</p>
+                                        <div className="flex flex-col gap-1.5">
+                                            <div
+                                                className="px-3 py-2"
+                                                style={{
+                                                    background: "rgba(12,45,94,0.4)",
+                                                    border: `1px solid ${C.border}`,
+                                                    borderRadius: "12px 12px 12px 4px",
+                                                }}
+                                            >
+                                                <p
+                                                    className="text-[11px] font-mono m-0 leading-[1.5]"
+                                                    style={{ color: "rgba(245,240,232,0.75)" }}
+                                                >
+                                                    {msg.text}
+                                                </p>
                                             </div>
-                                            {/* Inline suggestion card if AI response has one */}
                                             {msg.suggestion && (
-                                                <div style={{ padding: "10px 12px", background: "rgba(12,45,94,0.35)", border: `1px solid ${C.border}`, borderRadius: 10 }}>
-                                                    <p style={{ fontSize: 11, fontWeight: 600, color: C.white, margin: "0 0 6px" }}>{msg.suggestion.title}</p>
+                                                <div
+                                                    className="px-3 py-2.5 rounded-[10px]"
+                                                    style={{ background: "rgba(12,45,94,0.35)", border: `1px solid ${C.border}` }}
+                                                >
+                                                    <p className="text-[11px] font-semibold mb-1.5 m-0" style={{ color: C.white }}>
+                                                        {msg.suggestion.title}
+                                                    </p>
                                                     {msg.suggestion.accepted === null && (
-                                                        <div style={{ display: "flex", gap: 6 }}>
-                                                            <button onClick={() => acceptSuggestion(i)} style={{ flex: 1, padding: "5px 0", background: C.success, border: "none", borderRadius: 7, color: C.white, fontSize: 10, fontWeight: 700, cursor: "pointer" }}>✓ Accept</button>
-                                                            <button onClick={() => rejectSuggestion(i)} style={{ padding: "5px 10px", background: "transparent", border: `1px solid ${C.border}`, borderRadius: 7, color: C.muted, fontSize: 10, cursor: "pointer" }}>✕</button>
+                                                        <div className="flex gap-1.5">
+                                                            <button
+                                                                onClick={() => acceptSuggestion(i)}
+                                                                className="flex-1 py-[5px] rounded-[7px] border-none text-white text-[10px] font-bold cursor-pointer"
+                                                                style={{ background: C.success }}
+                                                            >
+                                                                ✓ Accept
+                                                            </button>
+                                                            <button
+                                                                onClick={() => rejectSuggestion(i)}
+                                                                className="px-2.5 py-[5px] rounded-[7px] bg-transparent text-[10px] cursor-pointer"
+                                                                style={{ border: `1px solid ${C.border}`, color: C.muted }}
+                                                            >
+                                                                ✕
+                                                            </button>
                                                         </div>
                                                     )}
                                                     {msg.suggestion.accepted !== null && (
-                                                        <p style={{ fontSize: 9, color: msg.suggestion.accepted ? C.success : C.muted, fontFamily: "DM Mono", margin: 0 }}>
+                                                        <p
+                                                            className="text-[9px] font-mono m-0"
+                                                            style={{ color: msg.suggestion.accepted ? C.success : C.muted }}
+                                                        >
                                                             {msg.suggestion.accepted ? "✓ Accepted" : "✕ Dismissed"}
                                                         </p>
                                                     )}
@@ -615,34 +842,50 @@ export default function PlannerPage() {
                         </div>
 
                         {/* Command Input */}
-                        <div style={{ padding: "10px 14px", borderTop: `1px solid ${C.border}`, marginTop: "auto" }}>
-                            <p style={{ fontSize: 8, color: C.dim, fontFamily: "DM Mono", textTransform: "uppercase", letterSpacing: "0.15em", margin: "0 0 8px" }}>Command Input</p>
-                            <form onSubmit={handleCommand} style={{ display: "flex", gap: 6 }}>
+                        <div className="px-3.5 py-2.5 mt-auto" style={{ borderTop: `1px solid ${C.border}` }}>
+                            <p className="text-[8px] font-mono uppercase tracking-[0.15em] mb-2 m-0" style={{ color: C.dim }}>
+                                Command Input
+                            </p>
+                            <form onSubmit={handleCommand} className="flex gap-1.5">
                                 <input
                                     value={command}
                                     onChange={e => setCommand(e.target.value)}
                                     placeholder="E.g., 'move math to evening'"
+                                    className="flex-1 px-2.5 py-2 rounded-lg text-[11px] outline-none font-mono text-white"
                                     style={{
-                                        flex: 1, padding: "8px 10px",
                                         background: "rgba(10,22,40,0.8)",
                                         border: `1px solid ${C.border}`,
-                                        borderRadius: 8, color: C.white,
-                                        fontSize: 11, outline: "none",
-                                        fontFamily: "DM Mono",
                                     }}
                                 />
-                                <button type="submit" disabled={isThinking} style={{ padding: "8px 10px", background: C.accent, border: "none", borderRadius: 8, color: C.white, cursor: "pointer", display: "flex", alignItems: "center" }}>
-                                    {isThinking ? <Loader size={13} style={{ animation: "pulse 1s infinite" }} /> : <Send size={13} />}
+                                <button
+                                    type="submit"
+                                    disabled={isThinking}
+                                    className="flex items-center px-2.5 py-2 rounded-lg border-none text-white cursor-pointer"
+                                    style={{ background: C.accent }}
+                                >
+                                    {isThinking
+                                        ? <Loader size={13} style={{ animation: "pulse 1s infinite" }} />
+                                        : <Send size={13} />
+                                    }
                                 </button>
                             </form>
                         </div>
 
                         {/* Gemini badge */}
-                        <div style={{ padding: "10px 14px", borderTop: `1px solid ${C.border}`, display: "flex", gap: 8, alignItems: "center" }}>
-                            <div style={{ width: 22, height: 22, borderRadius: 6, background: `linear-gradient(135deg, #4285F4, ${C.accent})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, flexShrink: 0 }}>✦</div>
+                        <div className="flex gap-2 items-center px-3.5 py-2.5" style={{ borderTop: `1px solid ${C.border}` }}>
+                            <div
+                                className="w-[22px] h-[22px] rounded-[6px] flex items-center justify-center text-[11px] shrink-0"
+                                style={{ background: `linear-gradient(135deg, #4285F4, ${C.accent})` }}
+                            >
+                                ✦
+                            </div>
                             <div>
-                                <p style={{ fontSize: 9, fontWeight: 600, margin: 0, color: "rgba(245,240,232,0.7)" }}>Gemini 1.5 Flash</p>
-                                <p style={{ fontSize: 8, color: C.dim, margin: 0, fontFamily: "DM Mono" }}>Autonomous planner</p>
+                                <p className="text-[9px] font-semibold m-0" style={{ color: "rgba(245,240,232,0.7)" }}>
+                                    Gemini 1.5 Flash
+                                </p>
+                                <p className="text-[8px] font-mono m-0" style={{ color: C.dim }}>
+                                    Autonomous planner
+                                </p>
                             </div>
                         </div>
                     </div>
