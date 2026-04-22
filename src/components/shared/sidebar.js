@@ -1,16 +1,15 @@
 'use client';
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import { Home, MessageSquare, Book, Rss, BarChart2, User } from 'lucide-react';
+import { Home, MessageSquare, Calendar, BarChart2, User } from 'lucide-react';
 
 export default function Sidebar({ activePage }) {
     const router = useRouter();
 
     const menuItems = [
         { icon: <Home size={20} />, label: "Home", path: "/dashboard", id: "home" },
-        { icon: <MessageSquare size={20} />, label: "AI Assistant", path: "/assistant", id: "assistant" },
-        { icon: <Book size={20} />, label: "Journal", path: "/journal", id: "journal" },
-        { icon: <Rss size={20} />, label: "Feed", path: "/feed", id: "feed" },
+        { icon: <Calendar size={20} />, label: "Planner", path: "/planner", id: "planner" },
+        { icon: <MessageSquare size={20} />, label: "Tools", path: "/tools", id: "tools" },
         { icon: <BarChart2 size={20} />, label: "Analysis", path: "/analysis", id: "analysis" },
         { icon: <User size={20} />, label: "Profile", path: "/profile", id: "profile" },
     ];
@@ -32,8 +31,8 @@ export default function Sidebar({ activePage }) {
                         key={item.id}
                         onClick={() => router.push(item.path)}
                         className={`flex items-center gap-4 px-4 py-3 rounded-xl cursor-pointer transition-all ${activePage === item.id
-                                ? 'bg-[#185FA5]/20 text-[#C9A84C] border border-[#185FA5]/20'
-                                : 'text-[#F5F0E8]/40 hover:bg-white/5 hover:text-white'
+                            ? 'bg-[#185FA5]/20 text-[#C9A84C] border border-[#185FA5]/20'
+                            : 'text-[#F5F0E8]/40 hover:bg-white/5 hover:text-white'
                             }`}
                     >
                         {item.icon}

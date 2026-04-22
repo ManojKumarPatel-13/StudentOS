@@ -64,10 +64,9 @@ export default function NotesPage() {
             <button
               onClick={handleCopy}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-all duration-300
-                ${
-                  copied
-                    ? "bg-cyan-500 text-black border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.8)]"
-                    : "bg-white/5 border-white/10 hover:bg-white/10"
+                ${copied
+                  ? "bg-cyan-500 text-black border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.8)]"
+                  : "bg-white/5 border-white/10 hover:bg-white/10"
                 }`}
             >
               <Copy size={16} />
@@ -78,10 +77,9 @@ export default function NotesPage() {
             <button
               onClick={handleDownload}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-all duration-300
-                ${
-                  downloaded
-                    ? "bg-cyan-500 text-black border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.8)]"
-                    : "bg-white/5 border-white/10 hover:bg-white/10"
+                ${downloaded
+                  ? "bg-cyan-500 text-black border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.8)]"
+                  : "bg-white/5 border-white/10 hover:bg-white/10"
                 }`}
             >
               <FileDown size={16} />
@@ -92,10 +90,9 @@ export default function NotesPage() {
             <button
               onClick={handleRegen}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-all duration-300
-                ${
-                  regen
-                    ? "bg-cyan-500 text-black border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.8)]"
-                    : "border-cyan-400 text-cyan-400 hover:bg-cyan-400/10"
+                ${regen
+                  ? "bg-cyan-500 text-black border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.8)]"
+                  : "border-cyan-400 text-cyan-400 hover:bg-cyan-400/10"
                 }`}
             >
               <RefreshCw size={16} />
@@ -137,11 +134,10 @@ export default function NotesPage() {
                     <button
                       key={key}
                       onClick={() => setMode(key)}
-                      className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm transition ${
-                        mode === key
+                      className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm transition ${mode === key
                           ? "bg-cyan-500 text-black font-medium shadow-md"
                           : "text-gray-400 hover:text-white"
-                      }`}
+                        }`}
                     >
                       <Icon size={16} />
                       {label}

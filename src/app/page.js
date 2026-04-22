@@ -89,7 +89,7 @@ export default function LandingPage() {
               <div className="space-y-4 pt-4">
                 <SidebarItem icon={<MessageSquare size={18} />} label="Ask AI" shrunk={isScrolled} />
                 <SidebarItem icon={<Camera size={18} />} label="Capture" shrunk={isScrolled} />
-                <Link href="/planner" target="_blank" className="block w-full">
+                <Link href="/aiChat" target="_blank" className="block w-full">
                   <SidebarItem
                     icon={<Calendar size={18} />}
                     label="Planner"
