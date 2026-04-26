@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
 import {
-    AreaChart, Area, BarChart, Bar, XAxis, YAxis,
+    AreaChart, Area, XAxis, YAxis,
     CartesianGrid, Tooltip, ResponsiveContainer,
     RadarChart, PolarGrid, PolarAngleAxis, Radar,
 } from "recharts";
@@ -10,26 +10,20 @@ import { useAuth } from "@/context/authContext";
 import {
     getSessionsInRange, aggregateByDay, fillDateGaps,
     formatDateLabel, getDateRange, getUserStats, getAILogs,
-    buildHeatmap,
+    buildHeatmap, computeRadarData, subscribeToStats,
+    subscribeToSessions, generateAndSaveAILogs,
 } from "@/lib/services/analysisService";
 
-// ── THEME TOKENS ──────────────────────────────────────────────────────────────
+// ── THEME ─────────────────────────────────────────────────────────────────────
 const T = {
-    bg: "#0A1628",
-    primary: "#0C2D5E",
-    accent: "#185FA5",
-    gold: "#C9A84C",
-    surface: "#F5F0E8",
-    white: "#FFFFFF",
-    // derived
-    border: "rgba(24,95,165,0.18)",
-    borderGold: "rgba(201,168,76,0.25)",
-    muted: "rgba(245,240,232,0.35)",
-    dim: "rgba(245,240,232,0.15)",
+    bg: "#0A1628", primary: "#0C2D5E", accent: "#185FA5",
+    gold: "#C9A84C", white: "#FFFFFF",
+    border: "rgba(24,95,165,0.18)", borderGold: "rgba(201,168,76,0.25)",
+    muted: "rgba(245,240,232,0.35)", dim: "rgba(245,240,232,0.15)",
 };
 
-// ── FALLBACK DATA (shown while Firestore loads) ────────────────────────────────
-const FALLBACK_WEEK = [
+// ── FALLBACKS ─────────────────────────────────────────────────────────────────
+const FB_CHART = [
     { date: "Mon", hours: 3.5, focusScore: 72, retention: 65, energy: 80, sessions: 3 },
     { date: "Tue", hours: 4.2, focusScore: 85, retention: 78, energy: 70, sessions: 4 },
     { date: "Wed", hours: 2.1, focusScore: 60, retention: 82, energy: 55, sessions: 2 },
@@ -38,22 +32,13 @@ const FALLBACK_WEEK = [
     { date: "Sat", hours: 6.1, focusScore: 95, retention: 88, energy: 92, sessions: 6 },
     { date: "Sun", hours: 2.5, focusScore: 68, retention: 71, energy: 60, sessions: 2 },
 ];
-
-const FALLBACK_STATS = {
-    streak: 14, totalHours: 127, topicsMastered: 23,
-    totalTopics: 40, avgFocusScore: 81, globalRank: 47,
-};
-
-const RADAR_DATA = [
-    { subject: "Focus", A: 85 },
-    { subject: "Memory", A: 72 },
-    { subject: "Speed", A: 90 },
-    { subject: "Consistency", A: 68 },
-    { subject: "Depth", A: 78 },
-    { subject: "Recall", A: 82 },
+const FB_STATS = { streak: 0, totalHours: 0, topicsMastered: 0, totalTopics: 40, avgFocusScore: 0, globalRank: null };
+const FB_RADAR = [
+    { subject: "Focus", A: 0 }, { subject: "Memory", A: 0 },
+    { subject: "Speed", A: 0 }, { subject: "Consistency", A: 0 },
+    { subject: "Depth", A: 0 }, { subject: "Recall", A: 0 },
 ];
-
-const FALLBACK_LOGS = [
+const FB_LOGS = [
     { time: "08:12", type: "SYSTEM", msg: "Concentration peak detected between 08:00–10:30." },
     { time: "09:45", type: "ANALYSIS", msg: "Retention for 'Data Structures' dropping 12%. Schedule review." },
     { time: "11:20", type: "PATTERN", msg: "You study 34% more efficiently after a 15-min break." },
@@ -61,15 +46,11 @@ const FALLBACK_LOGS = [
     { time: "14:30", type: "INSIGHT", msg: "Optimal deep-work window: 09:00–11:00 based on 14-day trend." },
     { time: "16:10", type: "ANALYSIS", msg: "React Patterns mastery at 68%. ETA: 4 days at current velocity." },
     { time: "17:22", type: "PATTERN", msg: "Morning sessions yield 2.4x better recall than evenings." },
-    { time: "18:00", type: "INSIGHT", msg: "Consider switching DBMS to morning slot for better retention." },
 ];
 
 const LOG_COLORS = {
-    SYSTEM: T.accent,
-    ANALYSIS: T.gold,
-    PATTERN: "#7C3AED",
-    ALERT: "#EF4444",
-    INSIGHT: "#10B981",
+    SYSTEM: T.accent, ANALYSIS: T.gold,
+    PATTERN: "#7C3AED", ALERT: "#EF4444", INSIGHT: "#10B981",
 };
 
 const RANGE_OPTIONS = [
@@ -88,7 +69,6 @@ const METRIC_OPTIONS = [
 
 // ── HEATMAP ───────────────────────────────────────────────────────────────────
 function buildHeatmapGrid(heatmap) {
-    // Last 16 weeks × 7 days
     const weeks = 16;
     const cells = [];
     const today = new Date();
@@ -97,43 +77,38 @@ function buildHeatmapGrid(heatmap) {
             const date = new Date(today);
             date.setDate(today.getDate() - (w * 7 + (6 - d)));
             const key = date.toISOString().split("T")[0];
-            cells.push({ date: key, hours: heatmap[key] || 0, dow: d });
+            cells.push({ date: key, hours: heatmap[key] || 0 });
         }
     }
     return cells;
 }
 
-function heatColor(hours) {
-    if (hours === 0) return `rgba(12,45,94,0.45)`;
-    if (hours < 1) return `rgba(24,95,165,0.45)`;
-    if (hours < 2) return `rgba(24,95,165,0.7)`;
-    if (hours < 3.5) return `rgba(0,180,220,0.75)`;
-    if (hours < 5) return `rgba(0,210,240,0.88)`;
-    return `rgba(201,168,76,0.95)`;
+function heatColor(h) {
+    if (h === 0) return "rgba(12,45,94,0.45)";
+    if (h < 1) return "rgba(24,95,165,0.45)";
+    if (h < 2) return "rgba(24,95,165,0.7)";
+    if (h < 3.5) return "rgba(0,180,220,0.75)";
+    if (h < 5) return "rgba(0,210,240,0.88)";
+    return "rgba(201,168,76,0.95)";
 }
 
 function HeatmapGrid({ cells, hoveredCell, onHover }) {
-    const weeks = 16;
     return (
-        <div style={{ display: "grid", gridTemplateColumns: `repeat(${weeks}, 1fr)`, gap: 4 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(16, 1fr)", gap: 4 }}>
             {cells.map((cell, i) => {
                 const isHov = hoveredCell?.date === cell.date;
                 return (
-                    <div
-                        key={i}
+                    <div key={i}
                         onMouseEnter={() => onHover(cell)}
                         onMouseLeave={() => onHover(null)}
                         style={{
-                            width: "100%",
-                            paddingBottom: "100%",
-                            borderRadius: 4,
+                            width: "100%", paddingBottom: "100%", borderRadius: 4,
                             background: heatColor(cell.hours),
-                            border: isHov ? `1.5px solid ${T.gold}` : `1px solid rgba(24,95,165,0.1)`,
+                            border: isHov ? `1.5px solid ${T.gold}` : "1px solid rgba(24,95,165,0.1)",
                             transform: isHov ? "scale(1.35)" : "scale(1)",
-                            transition: "transform 0.15s ease, border 0.15s ease",
-                            position: "relative",
-                            zIndex: isHov ? 10 : 1,
-                            boxShadow: cell.hours > 3 ? `0 0 6px rgba(0,200,255,0.3)` : "none",
+                            transition: "transform 0.15s ease",
+                            position: "relative", zIndex: isHov ? 10 : 1,
+                            boxShadow: cell.hours > 3 ? "0 0 6px rgba(0,200,255,0.3)" : "none",
                             cursor: "pointer",
                         }}
                     />
@@ -160,15 +135,11 @@ function WaveformBar() {
     );
 }
 
-// ── CUSTOM TOOLTIP ────────────────────────────────────────────────────────────
+// ── TOOLTIP ───────────────────────────────────────────────────────────────────
 function ChartTooltip({ active, payload, label }) {
     if (!active || !payload?.length) return null;
     return (
-        <div style={{
-            background: T.primary, border: `1px solid ${T.border}`,
-            borderRadius: 10, padding: "10px 14px",
-            fontFamily: "monospace", fontSize: 11,
-        }}>
+        <div style={{ background: T.primary, border: `1px solid ${T.border}`, borderRadius: 10, padding: "10px 14px", fontFamily: "monospace", fontSize: 11 }}>
             <p style={{ color: T.gold, fontWeight: 700, marginBottom: 6 }}>{label}</p>
             {payload.map(p => (
                 <p key={p.name} style={{ color: p.color, margin: "2px 0" }}>
@@ -179,28 +150,17 @@ function ChartTooltip({ active, payload, label }) {
     );
 }
 
-// ── CARD WRAPPER ──────────────────────────────────────────────────────────────
+// ── CARD ──────────────────────────────────────────────────────────────────────
 function Card({ children, style = {} }) {
     return (
-        <div style={{
-            background: T.primary + "55",
-            border: `1px solid ${T.border}`,
-            borderRadius: 20,
-            padding: 24,
-            backdropFilter: "blur(16px)",
-            ...style,
-        }}>
+        <div style={{ background: T.primary + "55", border: `1px solid ${T.border}`, borderRadius: 20, padding: 24, backdropFilter: "blur(16px)", ...style }}>
             {children}
         </div>
     );
 }
 
 function SectionLabel({ text }) {
-    return (
-        <p style={{ fontSize: 9, letterSpacing: "0.22em", color: T.muted, textTransform: "uppercase", fontFamily: "monospace", marginBottom: 4 }}>
-            {text}
-        </p>
-    );
+    return <p style={{ fontSize: 9, letterSpacing: "0.22em", color: T.muted, textTransform: "uppercase", fontFamily: "monospace", marginBottom: 4 }}>{text}</p>;
 }
 
 // ── MAIN PAGE ─────────────────────────────────────────────────────────────────
@@ -210,14 +170,35 @@ export default function AnalysisPage() {
 
     const [range, setRange] = useState("week");
     const [metric, setMetric] = useState("hours");
-    const [chartData, setChartData] = useState(FALLBACK_WEEK);
-    const [stats, setStats] = useState(FALLBACK_STATS);
+    const [chartData, setChartData] = useState(FB_CHART);
+    const [stats, setStats] = useState(FB_STATS);
+    const [radarData, setRadarData] = useState(FB_RADAR);
     const [aiLogs, setAiLogs] = useState([]);
     const [visibleLogs, setVisibleLogs] = useState([]);
     const [heatmap, setHeatmap] = useState({});
     const [hoveredCell, setHoveredCell] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [hasData, setHasData] = useState(false);
     const logRef = useRef(null);
+
+    // ── Real-time stats listener ───────────────────────────────────────────
+    useEffect(() => {
+        if (!uid) return;
+        return subscribeToStats(uid, s => {
+            setStats(prev => ({ ...prev, ...s }));
+        });
+    }, [uid]);
+
+    // ── Real-time sessions → heatmap ───────────────────────────────────────
+    useEffect(() => {
+        if (!uid) return;
+        return subscribeToSessions(uid, sessions => {
+            if (sessions.length) {
+                setHasData(true);
+                setHeatmap(buildHeatmap(sessions));
+            }
+        });
+    }, [uid]);
 
     // ── Fetch chart data when range changes ────────────────────────────────
     useEffect(() => {
@@ -230,35 +211,31 @@ export default function AnalysisPage() {
                 if (sessions.length) {
                     const agg = aggregateByDay(sessions);
                     const filled = fillDateGaps(agg, from, to);
-                    setChartData(filled.map(d => ({
-                        ...d,
-                        date: formatDateLabel(d.date, range),
-                    })));
-                    setHeatmap(buildHeatmap(sessions));
+                    setChartData(filled.map(d => ({ ...d, date: formatDateLabel(d.date, range) })));
+                    setHasData(true);
                 }
             } catch (e) { console.error(e); }
             setLoading(false);
         })();
     }, [uid, range]);
 
-    // ── Fetch stats ────────────────────────────────────────────────────────
+    // ── Compute radar from real data ───────────────────────────────────────
     useEffect(() => {
         if (!uid) return;
-        getUserStats(uid).then(s => { if (s) setStats(s); }).catch(console.error);
+        computeRadarData(uid).then(data => {
+            if (data) setRadarData(data);
+        });
     }, [uid]);
 
-    // ── Fetch + stream AI logs ─────────────────────────────────────────────
+    // ── Fetch AI logs ──────────────────────────────────────────────────────
     useEffect(() => {
-        if (!uid) {
-            // Use fallback logs and stream them
-            setAiLogs(FALLBACK_LOGS);
-            return;
-        }
+        if (!uid) { setAiLogs(FB_LOGS); return; }
         getAILogs(uid, 15)
-            .then(logs => setAiLogs(logs.length ? logs : FALLBACK_LOGS))
-            .catch(() => setAiLogs(FALLBACK_LOGS));
+            .then(logs => setAiLogs(logs.length ? logs : FB_LOGS))
+            .catch(() => setAiLogs(FB_LOGS));
     }, [uid]);
 
+    // ── Stream AI logs in one by one ───────────────────────────────────────
     useEffect(() => {
         setVisibleLogs([]);
         aiLogs.forEach((log, i) => {
@@ -273,80 +250,86 @@ export default function AnalysisPage() {
     const activeMetricCfg = METRIC_OPTIONS.find(m => m.key === metric);
 
     return (
-        <div style={{ display: "flex", minHeight: "100vh", background: T.bg, color: T.white, fontFamily: "'Space Grotesk', 'Inter', sans-serif" }}>
+        <div style={{ display: "flex", minHeight: "100vh", background: T.bg, color: T.white, fontFamily: "'Space Grotesk', sans-serif" }}>
 
-            {/* Google Fonts */}
             <style>{`
-                @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
-                @keyframes wave { from{transform:scaleY(0.35)} to{transform:scaleY(1)} }
-                @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
-                @keyframes slideIn { from{opacity:0;transform:translateX(-6px)} to{opacity:1;transform:translateX(0)} }
+                @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
+                @keyframes wave     { from{transform:scaleY(0.35)} to{transform:scaleY(1)} }
+                @keyframes blink    { 0%,100%{opacity:1} 50%{opacity:0} }
+                @keyframes slideIn  { from{opacity:0;transform:translateX(-6px)} to{opacity:1;transform:translateX(0)} }
                 @keyframes pulseDot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.6;transform:scale(0.85)} }
-                .log-entry { animation: slideIn 0.3s ease forwards; }
-                .range-btn:hover { background: rgba(24,95,165,0.15) !important; }
+                .log-entry  { animation: slideIn 0.3s ease forwards; }
+                .range-btn:hover  { background: rgba(24,95,165,0.15) !important; }
                 .metric-btn:hover { opacity: 0.9; }
                 ::-webkit-scrollbar { width: 4px; }
                 ::-webkit-scrollbar-thumb { background: rgba(24,95,165,0.3); border-radius: 2px; }
             `}</style>
 
-            {/* ── SIDEBAR ── */}
             <Sidebar activePage="analysis" />
 
-            {/* ── MAIN CONTENT ── */}
             <main style={{ flex: 1, marginLeft: 256, padding: "28px 28px 40px", minWidth: 0 }}>
 
-                {/* ── PAGE HEADER ── */}
+                {/* ── HEADER ── */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, borderBottom: `1px solid ${T.border}`, paddingBottom: 20 }}>
                     <div>
                         <p style={{ fontSize: 9, letterSpacing: "0.22em", color: T.muted, textTransform: "uppercase", fontFamily: "monospace", marginBottom: 4 }}>// cognitive_analysis.exe</p>
                         <h1 style={{ fontSize: 26, fontWeight: 700, margin: 0, letterSpacing: "-0.02em" }}>Intelligence Overview</h1>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 16px", background: `rgba(24,95,165,0.1)`, border: `1px solid ${T.border}`, borderRadius: 100 }}>
-                        <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#10B981", animation: "pulseDot 2s infinite" }} />
-                        <span style={{ fontSize: 10, color: T.muted, fontFamily: "monospace", letterSpacing: "0.1em" }}>LIVE SYNC</span>
+                    <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                        {!hasData && (
+                            <span style={{ fontSize: 10, color: T.gold, fontFamily: "monospace", background: "rgba(201,168,76,0.1)", border: `1px solid rgba(201,168,76,0.2)`, padding: "4px 10px", borderRadius: 100 }}>
+                                showing sample data — start a focus session to see real stats
+                            </span>
+                        )}
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 16px", background: "rgba(24,95,165,0.1)", border: `1px solid ${T.border}`, borderRadius: 100 }}>
+                            <div style={{ width: 6, height: 6, borderRadius: "50%", background: hasData ? "#10B981" : T.gold, animation: "pulseDot 2s infinite" }} />
+                            <span style={{ fontSize: 10, color: T.muted, fontFamily: "monospace", letterSpacing: "0.1em" }}>{hasData ? "LIVE SYNC" : "NO DATA YET"}</span>
+                        </div>
                     </div>
                 </div>
 
                 {/* ── TICKER ROW ── */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 20 }}>
 
-                    {/* Waveform */}
+                    {/* Mental Load */}
                     <Card>
                         <SectionLabel text="Active Mental Load" />
                         <WaveformBar />
                         <div style={{ marginTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <span style={{ fontSize: 24, fontWeight: 700, color: "#00C8FF" }}>87<span style={{ fontSize: 12, color: T.muted }}>/100</span></span>
-                            <span style={{ fontSize: 10, color: "#10B981", background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.25)", padding: "3px 10px", borderRadius: 100, fontFamily: "monospace" }}>PEAK ZONE</span>
+                            <span style={{ fontSize: 24, fontWeight: 700, color: "#00C8FF" }}>
+                                {stats.avgFocusScore || 0}<span style={{ fontSize: 12, color: T.muted }}>/100</span>
+                            </span>
+                            <span style={{ fontSize: 10, color: "#10B981", background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.25)", padding: "3px 10px", borderRadius: 100, fontFamily: "monospace" }}>
+                                {stats.avgFocusScore >= 80 ? "PEAK ZONE" : stats.avgFocusScore >= 60 ? "GOOD" : "BUILDING"}
+                            </span>
                         </div>
                     </Card>
 
-                    {/* Predictive Milestone */}
+                    {/* Streak / Predictive */}
                     <Card style={{ borderColor: T.borderGold }}>
-                        <SectionLabel text="Predictive Milestone" />
-                        <p style={{ fontSize: 13, color: "rgba(245,240,232,0.8)", lineHeight: 1.6, marginBottom: 10 }}>
-                            At current velocity, you'll master{" "}
-                            <span style={{ color: T.gold, fontWeight: 600 }}>'React Patterns'</span> in{" "}
-                            <span style={{ color: T.gold, fontWeight: 700 }}>4 days</span>.
-                        </p>
-                        <div style={{ height: 3, background: "rgba(201,168,76,0.12)", borderRadius: 2 }}>
-                            <div style={{ height: "100%", width: "68%", background: `linear-gradient(90deg, ${T.gold}, #F0C040)`, borderRadius: 2 }} />
+                        <SectionLabel text="Study Streak" />
+                        <div style={{ display: "flex", alignItems: "flex-end", gap: 8, marginBottom: 10 }}>
+                            <span style={{ fontSize: 36, fontWeight: 800, color: T.gold, lineHeight: 1 }}>{stats.streak || 0}</span>
+                            <span style={{ fontSize: 14, color: T.muted, marginBottom: 4 }}>days</span>
                         </div>
-                        <p style={{ fontSize: 10, color: T.muted, marginTop: 5, fontFamily: "monospace" }}>68% complete</p>
+                        <div style={{ height: 3, background: "rgba(201,168,76,0.12)", borderRadius: 2 }}>
+                            <div style={{ height: "100%", width: `${Math.min(100, ((stats.streak || 0) / 30) * 100)}%`, background: `linear-gradient(90deg, ${T.gold}, #F0C040)`, borderRadius: 2 }} />
+                        </div>
+                        <p style={{ fontSize: 10, color: T.muted, marginTop: 5, fontFamily: "monospace" }}>
+                            {stats.streak >= 7 ? "🔥 Week streak! Keep going." : stats.streak >= 3 ? "Building momentum." : "Start a session to begin your streak."}
+                        </p>
                     </Card>
 
-                    {/* Global Rank */}
+                    {/* Total Hours */}
                     <Card style={{ borderColor: "rgba(124,58,237,0.25)" }}>
-                        <SectionLabel text="Community Rank" />
-                        <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 4 }}>
-                            <div style={{ width: 50, height: 50, borderRadius: "50%", background: "linear-gradient(135deg, #7C3AED, #4F46E5)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 0 16px rgba(124,58,237,0.4)" }}>
-                                <span style={{ fontSize: 15, fontWeight: 800 }}>#{stats.globalRank || 47}</span>
-                            </div>
-                            <div>
-                                <p style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Top 5%</p>
-                                <p style={{ fontSize: 10, color: T.muted, fontFamily: "monospace", margin: "3px 0 0" }}>of 2,841 students</p>
-                            </div>
+                        <SectionLabel text="Total Study Hours" />
+                        <div style={{ display: "flex", alignItems: "flex-end", gap: 8, marginBottom: 6 }}>
+                            <span style={{ fontSize: 36, fontWeight: 800, color: "#A78BFA", lineHeight: 1 }}>{stats.totalHours || 0}</span>
+                            <span style={{ fontSize: 14, color: T.muted, marginBottom: 4 }}>hrs</span>
                         </div>
-                        <p style={{ fontSize: 10, color: "rgba(124,58,237,0.6)", fontFamily: "monospace", marginTop: 10 }}>↑ 12 positions this week</p>
+                        <p style={{ fontSize: 10, color: "rgba(124,58,237,0.6)", fontFamily: "monospace", marginTop: 4 }}>
+                            Avg focus: {stats.avgFocusScore || 0}% · {stats.streak || 0} day streak
+                        </p>
                     </Card>
                 </div>
 
@@ -360,8 +343,7 @@ export default function AnalysisPage() {
                                 <SectionLabel text="Cognitive Map" />
                                 <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Performance Matrix</h2>
                             </div>
-                            {/* Time range selector */}
-                            <div style={{ display: "flex", gap: 4, background: `rgba(12,45,94,0.6)`, padding: 4, borderRadius: 10, border: `1px solid ${T.border}` }}>
+                            <div style={{ display: "flex", gap: 4, background: "rgba(12,45,94,0.6)", padding: 4, borderRadius: 10, border: `1px solid ${T.border}` }}>
                                 {RANGE_OPTIONS.map(r => (
                                     <button key={r.key} className="range-btn" onClick={() => setRange(r.key)} style={{
                                         padding: "5px 12px", borderRadius: 7, border: "none", cursor: "pointer", fontSize: 11, fontWeight: 600, fontFamily: "monospace", transition: "all 0.2s",
@@ -372,11 +354,11 @@ export default function AnalysisPage() {
                             </div>
                         </div>
 
-                        {/* Metric selector */}
                         <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
                             {METRIC_OPTIONS.map(m => (
                                 <button key={m.key} className="metric-btn" onClick={() => setMetric(m.key)} style={{
-                                    padding: "4px 12px", borderRadius: 100, border: `1px solid ${metric === m.key ? m.color : T.border}`,
+                                    padding: "4px 12px", borderRadius: 100,
+                                    border: `1px solid ${metric === m.key ? m.color : T.border}`,
                                     background: metric === m.key ? `${m.color}20` : "transparent",
                                     color: metric === m.key ? m.color : T.muted,
                                     fontSize: 11, cursor: "pointer", fontFamily: "monospace", transition: "all 0.2s",
@@ -401,7 +383,7 @@ export default function AnalysisPage() {
                                             <feMerge><feMergeNode in="coloredBlur" /><feMergeNode in="SourceGraphic" /></feMerge>
                                         </filter>
                                     </defs>
-                                    <CartesianGrid strokeDasharray="3 3" stroke={`rgba(24,95,165,0.08)`} />
+                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(24,95,165,0.08)" />
                                     <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 10, fontFamily: "monospace" }} axisLine={false} tickLine={false} interval={range === "year" ? 30 : range === "3months" ? 6 : "preserveStartEnd"} />
                                     <YAxis tick={{ fill: T.muted, fontSize: 10, fontFamily: "monospace" }} axisLine={false} tickLine={false} />
                                     <Tooltip content={<ChartTooltip />} />
@@ -411,20 +393,23 @@ export default function AnalysisPage() {
                         )}
                     </Card>
 
-                    {/* Radar */}
+                    {/* Radar — now computed from real data */}
                     <Card>
                         <SectionLabel text="Skill Radar" />
-                        <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Cognitive Profile</h2>
-                        <ResponsiveContainer width="100%" height={200}>
-                            <RadarChart data={RADAR_DATA}>
+                        <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>Cognitive Profile</h2>
+                        <p style={{ fontSize: 10, color: T.muted, fontFamily: "monospace", marginBottom: 12 }}>
+                            {hasData ? "Computed from your sessions" : "Start sessions to compute"}
+                        </p>
+                        <ResponsiveContainer width="100%" height={180}>
+                            <RadarChart data={radarData}>
                                 <PolarGrid stroke={T.border} />
                                 <PolarAngleAxis dataKey="subject" tick={{ fill: T.muted, fontSize: 10, fontFamily: "monospace" }} />
                                 <Radar name="Score" dataKey="A" stroke={T.accent} fill={T.accent} fillOpacity={0.15} strokeWidth={1.5} />
                             </RadarChart>
                         </ResponsiveContainer>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 8 }}>
-                            {RADAR_DATA.map(r => (
-                                <div key={r.subject} style={{ display: "flex", justifyContent: "space-between", padding: "5px 10px", background: `rgba(12,45,94,0.5)`, borderRadius: 8, border: `1px solid ${T.border}` }}>
+                            {radarData.map(r => (
+                                <div key={r.subject} style={{ display: "flex", justifyContent: "space-between", padding: "5px 10px", background: "rgba(12,45,94,0.5)", borderRadius: 8, border: `1px solid ${T.border}` }}>
                                     <span style={{ fontSize: 11, color: T.muted, fontFamily: "monospace" }}>{r.subject}</span>
                                     <span style={{ fontSize: 11, color: T.accent, fontWeight: 700, fontFamily: "monospace" }}>{r.A}</span>
                                 </div>
@@ -433,11 +418,9 @@ export default function AnalysisPage() {
                     </Card>
                 </div>
 
-
                 {/* ── HEATMAP + AI LOG ── */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 16, marginBottom: 16 }}>
 
-                    {/* Deep-Work Heatmap */}
                     <Card>
                         <SectionLabel text="Deep-Work Heatmap" />
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
@@ -450,7 +433,6 @@ export default function AnalysisPage() {
                             )}
                         </div>
                         <HeatmapGrid cells={heatCells} hoveredCell={hoveredCell} onHover={setHoveredCell} />
-                        {/* Legend */}
                         <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 14, justifyContent: "flex-end" }}>
                             <span style={{ fontSize: 9, color: T.dim, fontFamily: "monospace" }}>less</span>
                             {["rgba(12,45,94,0.45)", "rgba(24,95,165,0.45)", "rgba(24,95,165,0.7)", "rgba(0,180,220,0.75)", "rgba(0,210,240,0.88)", "rgba(201,168,76,0.95)"].map((c, i) => (
@@ -460,7 +442,7 @@ export default function AnalysisPage() {
                         </div>
                     </Card>
 
-                    {/* Neural Sidebar — AI Log */}
+                    {/* AI Observation Log */}
                     <Card style={{ background: "rgba(6,13,26,0.9)", display: "flex", flexDirection: "column" }}>
                         <div style={{ marginBottom: 14 }}>
                             <SectionLabel text="Neural Sidebar" />
@@ -469,7 +451,6 @@ export default function AnalysisPage() {
                                 <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#10B981", animation: "pulseDot 1.5s infinite" }} />
                             </div>
                         </div>
-
                         <div ref={logRef} style={{ flex: 1, overflowY: "auto", maxHeight: 280, display: "flex", flexDirection: "column", gap: 6 }}>
                             {visibleLogs.map((log, i) => (
                                 <div key={i} className="log-entry" style={{ padding: "8px 10px", background: "rgba(12,45,94,0.3)", borderRadius: 8, borderLeft: `2px solid ${LOG_COLORS[log.type] || T.accent}` }}>
@@ -486,12 +467,10 @@ export default function AnalysisPage() {
                                 </div>
                             )}
                         </div>
-
-                        {/* Gemini badge */}
                         <div style={{ marginTop: 14, padding: "8px 12px", background: "rgba(24,95,165,0.08)", border: `1px solid ${T.border}`, borderRadius: 10, display: "flex", gap: 10, alignItems: "center" }}>
                             <div style={{ width: 26, height: 26, borderRadius: 7, background: `linear-gradient(135deg, #4285F4, ${T.accent})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, flexShrink: 0 }}>✦</div>
                             <div>
-                                <p style={{ fontSize: 10, fontWeight: 600, margin: 0, color: "rgba(245,240,232,0.8)" }}>Powered by Gemini 1.5 Flash</p>
+                                <p style={{ fontSize: 10, fontWeight: 600, margin: 0, color: "rgba(245,240,232,0.8)" }}>Powered by Gemini 2.0 Flash</p>
                                 <p style={{ fontSize: 9, color: T.dim, margin: 0, fontFamily: "monospace" }}>Real-time pattern analysis</p>
                             </div>
                         </div>
@@ -501,10 +480,10 @@ export default function AnalysisPage() {
                 {/* ── BOTTOM STATS ── */}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
                     {[
-                        { label: "Study Streak", value: stats.streak, unit: "days", color: T.gold, sub: "Personal best: 21 days" },
-                        { label: "Total Hours", value: stats.totalHours, unit: "hrs", color: "#00C8FF", sub: "This semester" },
-                        { label: "Topics Mastered", value: `${stats.topicsMastered}/${stats.totalTopics || 40}`, unit: "", color: "#10B981", sub: `${Math.round((stats.topicsMastered / (stats.totalTopics || 40)) * 100)}% complete` },
-                        { label: "Avg Focus Score", value: stats.avgFocusScore, unit: "%", color: "#A78BFA", sub: "↑ 8% from last week" },
+                        { label: "Study Streak", value: stats.streak || 0, unit: "days", color: T.gold, sub: stats.streak >= 7 ? "🔥 Week streak!" : "Keep going daily" },
+                        { label: "Total Hours", value: stats.totalHours || 0, unit: "hrs", color: "#00C8FF", sub: "All time" },
+                        { label: "Topics Mastered", value: `${stats.topicsMastered || 0}/${stats.totalTopics || 40}`, unit: "", color: "#10B981", sub: `${Math.round(((stats.topicsMastered || 0) / (stats.totalTopics || 40)) * 100)}% complete` },
+                        { label: "Avg Focus Score", value: stats.avgFocusScore || 0, unit: "%", color: "#A78BFA", sub: stats.avgFocusScore >= 80 ? "Excellent" : "Keep improving" },
                     ].map(stat => (
                         <Card key={stat.label} style={{ padding: "18px 20px" }}>
                             <p style={{ fontSize: 9, letterSpacing: "0.18em", color: T.dim, textTransform: "uppercase", fontFamily: "monospace", marginBottom: 8 }}>{stat.label}</p>
