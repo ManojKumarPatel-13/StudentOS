@@ -1,152 +1,205 @@
 "use client";
 
 import Sidebar from "@/components/shared/sidebar";
-import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { SlidersHorizontal } from "lucide-react";
+import { useState, useEffect } from "react";
+import { MessageSquare, FileText, Zap, Clock, ArrowRight, Sparkles } from "lucide-react";
+import { useAuth } from "@/context/authContext";
+import { getToolsActivity } from "@/lib/services/toolsService";
+
+const TOOLS = [
+  {
+    id: "ai",
+    title: "AI Assistant",
+    desc: "Ask anything academic. Powered by Gemini — explains concepts, solves problems, and builds your understanding step by step.",
+    btn: "Start Chat",
+    path: "/study-tools/ai",
+    icon: <MessageSquare size={22} />,
+    accent: "#185FA5",
+    glow: "rgba(24,95,165,0.15)",
+    border: "rgba(24,95,165,0.3)",
+    tag: "Gemini Powered",
+  },
+  {
+    id: "note",
+    title: "Notes Generator",
+    desc: "Transform any topic into clean, structured, exam-ready notes instantly. Supports text input, image upload, and PDF parsing.",
+    btn: "Generate Notes",
+    path: "/study-tools/note",
+    icon: <FileText size={22} />,
+    accent: "#C9A84C",
+    glow: "rgba(201,168,76,0.12)",
+    border: "rgba(201,168,76,0.3)",
+    tag: "AI Generated",
+  },
+  {
+    id: "quiz",
+    title: "Quiz Generator",
+    desc: "Create custom quizzes on any subject. Choose difficulty and question count, then test yourself with an interactive timer-based interface.",
+    btn: "Generate Quiz",
+    path: "/study-tools/quiz",
+    icon: <Zap size={22} />,
+    accent: "#10B981",
+    glow: "rgba(16,185,129,0.12)",
+    border: "rgba(16,185,129,0.3)",
+    tag: "Interactive",
+  },
+];
 
 export default function StudyTools() {
   const router = useRouter();
-<div className="ml-64 min-h-screen px-10 py-10"></div>
+  const { user } = useAuth();
+  const [activity, setActivity] = useState([]);
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    getToolsActivity(user.uid).then(setActivity);
+  }, [user]);
+
+  const filtered = TOOLS.filter(t =>
+    t.title.toLowerCase().includes(search.toLowerCase()) ||
+    t.desc.toLowerCase().includes(search.toLowerCase())
+  );
+
   return (
-    <div className="flex min-h-screen bg-[#071326] text-white">
+    <div className="flex min-h-screen bg-[#0A1628] text-white" style={{ fontFamily: "'Syne', sans-serif" }}>
+      <style>{`
+                @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+                @keyframes fadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+                @keyframes pulseDot { 0%,100%{transform:scale(1)} 50%{transform:scale(0.7)} }
+                .tool-card { transition: all 0.2s ease; }
+                .tool-card:hover { transform: translateY(-3px); }
+                ::-webkit-scrollbar { width: 3px; }
+                ::-webkit-scrollbar-thumb { background: rgba(24,95,165,0.3); border-radius: 2px; }
+            `}</style>
 
-      {/* SIDEBAR */}
-      <div className="w-[260px] shrink-0">
-        <Sidebar activePage="assistant" />
-      </div>
+      {/* Ambient glows */}
+      <div className="fixed pointer-events-none z-0" style={{ top: -100, left: 300, width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(24,95,165,0.06) 0%, transparent 65%)" }} />
+      <div className="fixed pointer-events-none z-0" style={{ bottom: -100, right: 100, width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(201,168,76,0.04) 0%, transparent 65%)" }} />
 
-      {/* MAIN CONTENT */}
-      <div className="flex-1 px-10 py-10 relative overflow-hidden">
+      <Sidebar activePage="tools" />
 
-        {/* BACKGROUND LIGHT */}
-        <div className="absolute top-[-200px] left-[200px] w-[500px] h-[500px] bg-blue-600/20 blur-[150px]"></div>
-        <div className="absolute bottom-[-200px] right-[-200px] w-[500px] h-[500px] bg-purple-600/20 blur-[150px]"></div>
+      <main className="flex-1 ml-64 p-10 relative z-10">
 
-        {/* HEADER */}
-        <h1 className="text-5xl font-bold mb-2">Study Tools</h1>
-        <p className="text-gray-400 mb-8">
-          Powerful tools to supercharge your learning
-        </p>
+        {/* Header */}
+        <div className="mb-10" style={{ animation: "fadeUp 0.4s ease both" }}>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center"
+              style={{ background: "linear-gradient(135deg, #185FA5, #0C2D5E)", border: "1px solid rgba(24,95,165,0.4)" }}>
+              <Sparkles size={14} color="#C9A84C" />
+            </div>
+            <span className="text-[10px] font-mono uppercase tracking-[0.3em] text-white/30">Neural Toolkit</span>
+          </div>
+          <h1 className="text-4xl font-black tracking-tighter">Study Tools</h1>
+          <p className="text-white/40 mt-2 text-sm">AI-powered tools to accelerate your learning</p>
+        </div>
 
-        {/* SEARCH */}
-        <div className="flex gap-3 mb-10 max-w-xl">
+        {/* Search */}
+        <div className="mb-8" style={{ animation: "fadeUp 0.4s 0.05s ease both" }}>
           <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
             placeholder="Search tools..."
-            className="flex-1 px-5 py-3 rounded-xl bg-[#0d1b2f] border border-white/10 focus:outline-none focus:border-blue-500"
+            className="w-full max-w-sm px-5 py-3 rounded-2xl text-sm outline-none transition-all placeholder:text-white/20"
+            style={{ background: "rgba(12,45,94,0.3)", border: "1px solid rgba(24,95,165,0.2)", color: "white" }}
+            onFocus={e => e.target.style.borderColor = "rgba(201,168,76,0.4)"}
+            onBlur={e => e.target.style.borderColor = "rgba(24,95,165,0.2)"}
           />
-          
-          {/* ✅ FILTER ICON BUTTON */}
-          <button className="px-4 rounded-xl bg-[#0d1b2f] border border-white/10 hover:bg-white/5 transition flex items-center justify-center">
-            <SlidersHorizontal size={18} className="text-gray-300" />
-          </button>
         </div>
 
-        {/* GRID */}
-        <div className="grid grid-cols-3 gap-8">
+        {/* Tools Grid */}
+        <div className="grid grid-cols-3 gap-6 mb-10">
+          {filtered.map((tool, i) => (
+            <div key={tool.id} className="tool-card rounded-[28px] p-7 cursor-pointer"
+              style={{
+                animation: `fadeUp 0.4s ${0.1 + i * 0.06}s ease both`,
+                background: "rgba(12,45,94,0.2)",
+                border: `1px solid ${tool.border}`,
+                boxShadow: `0 0 40px ${tool.glow}`,
+              }}
+              onClick={() => router.push(tool.path)}>
 
-          {/* LEFT CARDS */}
-          <div className="col-span-2 grid grid-cols-2 gap-8">
-
-            {[
-              {
-                title: "AI Assistant",
-                desc: "Get instant answers to any question. Powered by advanced AI to help you learn faster and understand complex topics.",
-                btn: "Start Chat →",
-                gradient: "from-blue-500 to-cyan-500",
-                path: "/study-tools/ai",
-              },
-              {
-                title: "Notes Generator",
-                desc: "Transform your ideas into well-structured, organized notes instantly with intelligent formatting and categorization.",
-                btn: "Create Notes →",
-                gradient: "from-pink-500 to-purple-500",
-                path: "/study-tools/note",
-              },
-              {
-                title: "Study Planner",
-                desc: "Create personalized study plans based on your goals and time.",
-                btn: "Create Plan →",
-                gradient: "from-indigo-500 to-purple-500",
-                path: "/study-tools/planner",
-              },
-              {
-                title: "Quiz Generator",
-                desc: "Create custom quizzes from any topic to test your knowledge effectively.",
-                btn: "Generate Quiz →",
-                gradient: "from-cyan-500 to-blue-500",
-                path: "/study-tools/quiz",
-              },
-            ].map((tool, i) => (
-              <motion.div
-                key={i}
-                whileHover={{ scale: 1.03 }}
-                whileTap={{ scale: 0.97 }}
-                className="relative p-7 rounded-2xl 
-                bg-gradient-to-br from-[#0f1c34]/80 to-[#0a1628]/80 
-                border border-white/5 
-                backdrop-blur-2xl 
-                shadow-[0_10px_40px_rgba(0,0,0,0.6)] 
-                overflow-hidden group transition duration-300"
-              >
-
-                {/* HOVER LIGHT */}
-                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition duration-500 bg-gradient-to-br from-white/10 via-transparent to-transparent"></div>
-
-                <div className="relative z-10">
-                  <h2 className="text-xl font-semibold mb-3">
-                    {tool.title}
-                  </h2>
-
-                  <p className="text-gray-400 text-sm mb-6 leading-relaxed">
-                    {tool.desc}
-                  </p>
-
-                  <motion.button
-                    onClick={() => router.push(tool.path)}
-                    whileHover={{ backgroundPosition: "100% 0%" }}
-                    transition={{ duration: 0.4 }}
-                    className={`w-full py-2 rounded-lg bg-gradient-to-r ${tool.gradient} bg-[length:200%_100%]`}
-                  >
-                    {tool.btn}
-                  </motion.button>
+              {/* Icon + Tag */}
+              <div className="flex items-start justify-between mb-5">
+                <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
+                  style={{ background: `${tool.glow}`, border: `1px solid ${tool.border}`, color: tool.accent }}>
+                  {tool.icon}
                 </div>
-              </motion.div>
-            ))}
+                <span className="text-[9px] font-mono uppercase tracking-[0.15em] px-2.5 py-1 rounded-full"
+                  style={{ background: `${tool.glow}`, border: `1px solid ${tool.border}`, color: tool.accent }}>
+                  {tool.tag}
+                </span>
+              </div>
+
+              <h2 className="text-lg font-black mb-2">{tool.title}</h2>
+              <p className="text-white/40 text-sm leading-relaxed mb-6">{tool.desc}</p>
+
+              <button
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all"
+                style={{ background: `${tool.accent}22`, border: `1px solid ${tool.border}`, color: tool.accent }}
+                onClick={e => { e.stopPropagation(); router.push(tool.path); }}>
+                {tool.btn} <ArrowRight size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {/* Bottom row: Recent Activity + Stats */}
+        <div className="grid grid-cols-2 gap-6" style={{ animation: "fadeUp 0.4s 0.3s ease both" }}>
+
+          {/* Recent Activity */}
+          <div className="rounded-[28px] p-7" style={{ background: "rgba(12,45,94,0.2)", border: "1px solid rgba(24,95,165,0.15)" }}>
+            <div className="flex items-center gap-2 mb-5">
+              <Clock size={14} className="text-white/30" />
+              <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/30">Recent Activity</span>
+            </div>
+            {activity.length === 0 ? (
+              <div className="text-center py-6 text-white/20">
+                <p className="text-sm font-mono">No activity yet</p>
+                <p className="text-xs mt-1">Use a tool to see your history</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {activity.slice(0, 5).map((a, i) => (
+                  <div key={i} className="flex items-center justify-between py-2"
+                    style={{ borderBottom: i < activity.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+                    <div className="flex items-center gap-3">
+                      <div className="w-1.5 h-1.5 rounded-full" style={{ background: a.color || "#185FA5", animation: "pulseDot 2s infinite" }} />
+                      <span className="text-sm font-semibold text-white/70">{a.tool}</span>
+                      {a.topic && <span className="text-xs text-white/30 font-mono">— {a.topic}</span>}
+                    </div>
+                    <span className="text-[10px] font-mono text-white/20">{a.time}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* RIGHT PANEL */}
-          <div className="space-y-6">
-
-            <div className="p-6 rounded-2xl bg-[#0d1b2f]/80 border border-white/5 backdrop-blur-xl shadow-lg">
-              <h3 className="text-lg font-semibold mb-4">Recent Activity</h3>
-
-              <div className="space-y-3 text-sm text-gray-400">
-                <div>AI Assistant • 2 min ago</div>
-                <div>Quiz Generator • 15 min ago</div>
-                <div>Notes Generator • 1 hour ago</div>
-              </div>
+          {/* Quick stats */}
+          <div className="rounded-[28px] p-7" style={{ background: "rgba(12,45,94,0.2)", border: "1px solid rgba(201,168,76,0.15)" }}>
+            <div className="flex items-center gap-2 mb-5">
+              <Sparkles size={14} style={{ color: "#C9A84C" }} />
+              <span className="text-[10px] font-mono uppercase tracking-[0.2em]" style={{ color: "#C9A84C" }}>Toolkit Stats</span>
             </div>
-
-            <div className="p-6 rounded-2xl bg-gradient-to-br from-purple-700/40 to-pink-600/40 border border-purple-500/20 backdrop-blur-xl shadow-lg">
-              <h3 className="text-lg font-semibold mb-2">Recommended</h3>
-
-              <p className="text-gray-300 text-sm mb-4">
-                Study Planner helps you organize your schedule with AI-powered planning.
-              </p>
-
-              <motion.button
-                whileHover={{ backgroundPosition: "100% 0%" }}
-                transition={{ duration: 0.4 }}
-                className="w-full py-2 rounded-lg bg-gradient-to-r from-pink-500 to-purple-500 bg-[length:200%_100%]"
-              >
-                Try it now →
-              </motion.button>
+            <div className="grid grid-cols-3 gap-4">
+              {[
+                { label: "Chats", val: activity.filter(a => a.tool === "AI Assistant").length, color: "#185FA5" },
+                { label: "Notes", val: activity.filter(a => a.tool === "Notes Generator").length, color: "#C9A84C" },
+                { label: "Quizzes", val: activity.filter(a => a.tool === "Quiz Generator").length, color: "#10B981" },
+              ].map(s => (
+                <div key={s.label} className="text-center py-4 rounded-2xl"
+                  style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                  <p className="text-2xl font-black" style={{ color: s.color }}>{s.val}</p>
+                  <p className="text-[10px] font-mono text-white/30 uppercase tracking-widest mt-1">{s.label}</p>
+                </div>
+              ))}
             </div>
-
+            <p className="text-[10px] font-mono text-white/20 mt-4 text-center">Activity logged automatically as you use each tool</p>
           </div>
         </div>
-      </div>
+
+      </main>
     </div>
   );
 }

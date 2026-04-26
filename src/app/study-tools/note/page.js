@@ -1,205 +1,284 @@
 "use client";
+import React, { useState, useEffect } from "react";
+import { ArrowLeft, FileText, ImageIcon, FileDown, Copy, RefreshCw, Save, Check, Loader, BookOpen, Clock } from "lucide-react";
 import Sidebar from "@/components/shared/sidebar";
-import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Copy, FileDown, RefreshCw, FileText, ImageIcon, ArrowLeft } from "lucide-react";
+import { useAuth } from "@/context/authContext";
+import { saveNote, getSavedNotes } from "@/lib/services/toolsService";
 
 export default function NotesPage() {
   const router = useRouter();
+  const { user } = useAuth();
+  const uid = user?.uid;
 
   const [topic, setTopic] = useState("");
   const [mode, setMode] = useState("text");
+  const [notes, setNotes] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [savedNotes, setSavedNotes] = useState([]);
+  const [selectedNote, setSelectedNote] = useState(null);
 
-  // 🔥 FEEDBACK STATES
+  // Button states
   const [copied, setCopied] = useState(false);
-  const [downloaded, setDownloaded] = useState(false);
-  const [regen, setRegen] = useState(false);
+  const [saved, setSaved] = useState(false);
 
-  // 🔥 HANDLERS
+  useEffect(() => {
+    if (!uid) return;
+    getSavedNotes(uid).then(setSavedNotes);
+  }, [uid]);
+
+  const handleGenerate = async () => {
+    if (!topic.trim()) return;
+    setLoading(true);
+    setNotes("");
+    setSelectedNote(null);
+
+    try {
+      const res = await fetch("/api/note", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setNotes(data.notes);
+      } else {
+        setNotes("Failed to generate notes. Please try again.");
+      }
+    } catch {
+      setNotes("Network error. Please check your connection.");
+    }
+    setLoading(false);
+  };
+
   const handleCopy = () => {
+    navigator.clipboard.writeText(notes);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
 
-  const handleDownload = () => {
-    setDownloaded(true);
-    setTimeout(() => setDownloaded(false), 1500);
+  const handleSave = async () => {
+    if (!notes || !uid) return;
+    await saveNote(uid, topic, notes, mode);
+    setSaved(true);
+    getSavedNotes(uid).then(setSavedNotes);
+    setTimeout(() => setSaved(false), 1500);
   };
 
-  const handleRegen = () => {
-    setRegen(true);
-    setTimeout(() => setRegen(false), 1200);
+  const handleDownload = () => {
+    const blob = new Blob([notes], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${topic || "notes"}.txt`;
+    a.click();
   };
+
+  const MODES = [
+    { key: "text", label: "Text", icon: FileText },
+    { key: "image", label: "Image", icon: ImageIcon },
+    { key: "pdf", label: "PDF", icon: FileDown },
+  ];
 
   return (
-    <div className="flex min-h-screen bg-[#071326] text-white">
-      <Sidebar />
+    <div className="flex min-h-screen bg-[#0A1628] text-white" style={{ fontFamily: "'Syne', sans-serif" }}>
+      <style>{`
+                @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+                @keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+                @keyframes spin { to{transform:rotate(360deg)} }
+                ::-webkit-scrollbar { width: 3px; }
+                ::-webkit-scrollbar-thumb { background: rgba(201,168,76,0.3); border-radius: 2px; }
+            `}</style>
 
-      <div className="flex-1 ml-64 px-10 py-8">
+      <Sidebar activePage="tools" />
 
-        {/* 🔙 BACK BUTTON */}
-        <div
-          onClick={() => router.push("/study-tools")}
-          className="flex items-center gap-2 text-sm text-gray-400 hover:text-cyan-400 cursor-pointer mb-4 transition"
-        >
-          <ArrowLeft size={16} />
-          Back to Study Tools
-        </div>
+      <main className="flex-1 ml-64 flex flex-col h-screen">
 
-        {/* HEADER */}
-        <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
-          <div>
-            <h1 className="text-3xl font-semibold text-cyan-400">
-              Notes Generator
-            </h1>
-            <p className="text-sm text-gray-400 mt-1">
-              Generate structured notes from text, images, or PDFs
-            </p>
+        {/* Header */}
+        <header className="flex items-center justify-between px-8 py-4 flex-shrink-0"
+          style={{ background: "rgba(10,22,40,0.9)", borderBottom: "1px solid rgba(201,168,76,0.12)", backdropFilter: "blur(20px)" }}>
+          <div className="flex items-center gap-4">
+            <button onClick={() => router.push("/study-tools")}
+              className="flex items-center gap-2 text-white/30 hover:text-white transition-colors text-sm font-mono">
+              <ArrowLeft size={15} /> Back
+            </button>
+            <div className="w-px h-5 bg-white/10" />
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-xl flex items-center justify-center"
+                style={{ background: "rgba(201,168,76,0.15)", border: "1px solid rgba(201,168,76,0.3)" }}>
+                <FileText size={13} color="#C9A84C" />
+              </div>
+              <div>
+                <h1 className="text-sm font-black">Notes Generator</h1>
+                <p className="text-[9px] font-mono text-white/30 uppercase tracking-widest">AI Structured Notes</p>
+              </div>
+            </div>
           </div>
 
-          {/* ACTION BUTTONS */}
-          <div className="flex gap-3">
+          {/* Action buttons */}
+          {notes && (
+            <div className="flex items-center gap-2">
+              {[
+                { label: copied ? "Copied!" : "Copy", icon: copied ? Check : Copy, action: handleCopy, active: copied },
+                { label: "Download", icon: FileDown, action: handleDownload, active: false },
+                { label: saved ? "Saved!" : "Save", icon: saved ? Check : Save, action: handleSave, active: saved },
+              ].map(b => (
+                <button key={b.label} onClick={b.action}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-[11px] font-bold transition-all"
+                  style={{
+                    background: b.active ? "rgba(201,168,76,0.2)" : "rgba(255,255,255,0.04)",
+                    border: `1px solid ${b.active ? "rgba(201,168,76,0.5)" : "rgba(255,255,255,0.08)"}`,
+                    color: b.active ? "#C9A84C" : "rgba(255,255,255,0.5)",
+                  }}>
+                  <b.icon size={12} /> {b.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </header>
 
-            {/* COPY */}
-            <button
-              onClick={handleCopy}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-all duration-300
-                ${copied
-                  ? "bg-cyan-500 text-black border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.8)]"
-                  : "bg-white/5 border-white/10 hover:bg-white/10"
-                }`}
-            >
-              <Copy size={16} />
-              {copied ? "Copied!" : "Copy"}
-            </button>
+        <div className="flex flex-1 overflow-hidden">
 
-            {/* PDF */}
-            <button
-              onClick={handleDownload}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-all duration-300
-                ${downloaded
-                  ? "bg-cyan-500 text-black border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.8)]"
-                  : "bg-white/5 border-white/10 hover:bg-white/10"
-                }`}
-            >
-              <FileDown size={16} />
-              {downloaded ? "Downloaded!" : "PDF"}
-            </button>
+          {/* Left panel - input */}
+          <div className="w-80 flex-shrink-0 flex flex-col gap-4 p-6 overflow-y-auto"
+            style={{ borderRight: "1px solid rgba(255,255,255,0.05)" }}>
 
-            {/* REGENERATE */}
-            <button
-              onClick={handleRegen}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-all duration-300
-                ${regen
-                  ? "bg-cyan-500 text-black border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.8)]"
-                  : "border-cyan-400 text-cyan-400 hover:bg-cyan-400/10"
-                }`}
-            >
-              <RefreshCw size={16} />
-              {regen ? "Done!" : "Regenerate"}
-            </button>
-
-          </div>
-        </div>
-
-        {/* MAIN GRID */}
-        <div className="grid grid-cols-2 gap-8">
-
-          {/* LEFT */}
-          <div className="space-y-6">
-
-            <div className="bg-[#0d1b2f]/80 border border-white/10 rounded-2xl p-6 backdrop-blur-xl shadow-xl">
-
-              <label className="text-sm text-gray-400 mb-2 block">
-                Topic or Subject
-              </label>
-
-              <input
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                placeholder="Enter topic (e.g. DBMS Normalization)"
-                className="w-full px-4 py-3 rounded-xl bg-[#071326] border border-white/10 focus:outline-none focus:border-cyan-400"
+            {/* Topic input */}
+            <div className="rounded-2xl p-5" style={{ background: "rgba(12,45,94,0.2)", border: "1px solid rgba(255,255,255,0.06)" }}>
+              <label className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/30 block mb-2">Topic</label>
+              <input value={topic} onChange={e => setTopic(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleGenerate()}
+                placeholder="e.g. DBMS Normalization, Newton's Laws..."
+                className="w-full px-4 py-2.5 rounded-xl text-sm outline-none transition-all placeholder:text-white/15 font-mono"
+                style={{ background: "rgba(10,22,40,0.6)", border: "1px solid rgba(24,95,165,0.2)", color: "white" }}
+                onFocus={e => e.target.style.borderColor = "rgba(201,168,76,0.4)"}
+                onBlur={e => e.target.style.borderColor = "rgba(24,95,165,0.2)"}
               />
 
-              {/* MODE */}
-              <div className="mt-5">
-                <p className="text-sm text-gray-400 mb-2">Input Mode</p>
+              {/* Mode selector */}
+              <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/30 mt-4 mb-2">Input Mode</p>
+              <div className="flex rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
+                {MODES.map(({ key, label, icon: Icon }) => (
+                  <button key={key} onClick={() => setMode(key)}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 text-[11px] font-bold transition-all"
+                    style={{
+                      background: mode === key ? "rgba(201,168,76,0.15)" : "transparent",
+                      color: mode === key ? "#C9A84C" : "rgba(255,255,255,0.3)",
+                      borderRight: key !== "pdf" ? "1px solid rgba(255,255,255,0.06)" : "none",
+                    }}>
+                    <Icon size={12} /> {label}
+                  </button>
+                ))}
+              </div>
 
-                <div className="flex bg-[#071326] rounded-xl p-1 border border-white/10">
-                  {[
-                    { key: "text", label: "Text", icon: FileText },
-                    { key: "images", label: "Images", icon: ImageIcon },
-                    { key: "pdf", label: "PDF", icon: FileDown },
-                  ].map(({ key, label, icon: Icon }) => (
-                    <button
-                      key={key}
-                      onClick={() => setMode(key)}
-                      className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm transition ${mode === key
-                          ? "bg-cyan-500 text-black font-medium shadow-md"
-                          : "text-gray-400 hover:text-white"
-                        }`}
-                    >
-                      <Icon size={16} />
-                      {label}
+              {/* Upload area */}
+              {mode !== "text" && (
+                <div className="mt-4 rounded-xl p-5 text-center cursor-pointer transition-all"
+                  style={{ border: "1px dashed rgba(201,168,76,0.25)", background: "rgba(201,168,76,0.04)" }}>
+                  <p className="text-xs font-bold" style={{ color: "#C9A84C" }}>
+                    {mode === "image" ? "Upload Images" : "Upload PDF"}
+                  </p>
+                  <p className="text-[10px] text-white/25 mt-1 font-mono">Drag & drop or click</p>
+                </div>
+              )}
+
+              <button onClick={handleGenerate} disabled={!topic.trim() || loading}
+                className="mt-5 w-full py-3 rounded-xl text-sm font-black transition-all flex items-center justify-center gap-2"
+                style={{
+                  background: topic.trim() && !loading ? "linear-gradient(135deg, #C9A84C, #A07830)" : "rgba(255,255,255,0.05)",
+                  color: topic.trim() && !loading ? "#0A1628" : "rgba(255,255,255,0.2)",
+                  cursor: topic.trim() && !loading ? "pointer" : "not-allowed",
+                }}>
+                {loading
+                  ? <><Loader size={14} style={{ animation: "spin 1s linear infinite" }} /> Generating...</>
+                  : <><FileText size={14} /> Generate Notes</>
+                }
+              </button>
+            </div>
+
+            {/* Quick topics */}
+            <div>
+              <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/20 mb-2 px-1">Quick Topics</p>
+              <div className="flex flex-wrap gap-2">
+                {["DBMS", "OS", "Algorithms", "React", "Physics", "Calculus"].map(t => (
+                  <button key={t} onClick={() => setTopic(t)}
+                    className="px-3 py-1.5 rounded-xl text-[11px] font-mono transition-all"
+                    style={{ background: "rgba(12,45,94,0.3)", border: "1px solid rgba(24,95,165,0.2)", color: "rgba(255,255,255,0.4)" }}>
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Saved notes */}
+            {savedNotes.length > 0 && (
+              <div className="rounded-2xl p-4" style={{ background: "rgba(12,45,94,0.2)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                <div className="flex items-center gap-2 mb-3">
+                  <Clock size={11} className="text-white/30" />
+                  <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/30">Saved Notes</p>
+                </div>
+                <div className="space-y-2">
+                  {savedNotes.slice(0, 5).map((n, i) => (
+                    <button key={i} onClick={() => { setSelectedNote(n); setNotes(n.content); setTopic(n.topic); }}
+                      className="w-full text-left px-3 py-2 rounded-xl text-xs transition-all"
+                      style={{
+                        background: selectedNote?.id === n.id ? "rgba(201,168,76,0.1)" : "rgba(255,255,255,0.03)",
+                        border: `1px solid ${selectedNote?.id === n.id ? "rgba(201,168,76,0.3)" : "rgba(255,255,255,0.06)"}`,
+                        color: "rgba(255,255,255,0.6)",
+                      }}>
+                      <BookOpen size={10} className="inline mr-1.5 opacity-50" />
+                      {n.topic}
                     </button>
                   ))}
                 </div>
               </div>
-
-              {/* UPLOAD */}
-              {mode !== "text" && (
-                <div className="mt-5 border border-dashed border-white/20 rounded-xl p-6 text-center bg-[#071326] hover:border-cyan-400 transition">
-                  <p className="text-cyan-400 font-medium">
-                    {mode === "images"
-                      ? "Upload multiple images"
-                      : "Upload PDF file"}
-                  </p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    Drag & drop or click to browse
-                  </p>
-                </div>
-              )}
-
-              <button className="mt-6 w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-blue-500 to-cyan-500 hover:scale-[1.02] transition">
-                ✨ Generate Notes
-              </button>
-            </div>
-
-            {/* TIPS */}
-            <div className="bg-[#0d1b2f]/80 border border-white/10 rounded-2xl p-5">
-              <h3 className="text-sm font-semibold text-cyan-400 mb-2">
-                💡 Pro Tips
-              </h3>
-
-              <ul className="text-xs text-gray-400 space-y-1">
-                <li>• Upload clear, high-resolution images</li>
-                <li>• Combine text + images for best results</li>
-                <li>• PDFs are automatically structured</li>
-                <li>• Export notes easily as PDF</li>
-              </ul>
-            </div>
+            )}
           </div>
 
-          {/* RIGHT OUTPUT */}
-          <div className="bg-[#0d1b2f]/80 border border-white/10 rounded-2xl flex items-center justify-center backdrop-blur-xl shadow-xl relative">
-
-            <div className="text-center">
-              <div className="w-16 h-16 mx-auto mb-4 flex items-center justify-center rounded-full bg-cyan-500/20 text-cyan-400 text-2xl shadow-[0_0_20px_rgba(34,211,238,0.4)]">
-                ✨
+          {/* Right panel - output */}
+          <div className="flex-1 p-6 overflow-y-auto">
+            {!notes && !loading && (
+              <div className="h-full flex flex-col items-center justify-center text-center"
+                style={{ animation: "fadeUp 0.4s ease both" }}>
+                <div className="w-16 h-16 rounded-3xl flex items-center justify-center mb-5"
+                  style={{ background: "rgba(201,168,76,0.1)", border: "1px solid rgba(201,168,76,0.2)" }}>
+                  <FileText size={26} color="#C9A84C" />
+                </div>
+                <h3 className="text-lg font-black mb-2">Notes will appear here</h3>
+                <p className="text-white/30 text-sm">Enter a topic and click Generate Notes</p>
               </div>
+            )}
 
-              <p className="text-lg font-medium text-gray-300">
-                Your generated notes will appear here
-              </p>
+            {loading && (
+              <div className="h-full flex flex-col items-center justify-center">
+                <Loader size={28} color="#C9A84C" style={{ animation: "spin 1s linear infinite", marginBottom: 16 }} />
+                <p className="text-white/40 text-sm font-mono">Generating structured notes...</p>
+              </div>
+            )}
 
-              <p className="text-sm text-gray-500 mt-2">
-                Enter a topic, upload images or PDFs, then click Generate
-              </p>
-            </div>
-
+            {notes && !loading && (
+              <div className="rounded-2xl p-7 h-full" style={{ background: "rgba(12,45,94,0.15)", border: "1px solid rgba(201,168,76,0.12)" }}>
+                <div className="flex items-center justify-between mb-5">
+                  <div>
+                    <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/30">Generated Notes</p>
+                    <h3 className="text-base font-black mt-0.5" style={{ color: "#C9A84C" }}>{topic}</h3>
+                  </div>
+                  <button onClick={handleGenerate}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all"
+                    style={{ background: "rgba(201,168,76,0.1)", border: "1px solid rgba(201,168,76,0.25)", color: "#C9A84C" }}>
+                    <RefreshCw size={11} /> Regenerate
+                  </button>
+                </div>
+                <div className="h-px mb-5" style={{ background: "linear-gradient(90deg, rgba(201,168,76,0.3), transparent)" }} />
+                <pre className="text-sm text-white/75 leading-relaxed whitespace-pre-wrap font-mono"
+                  style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                  {notes}
+                </pre>
+              </div>
+            )}
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
