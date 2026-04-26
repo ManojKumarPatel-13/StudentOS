@@ -1,218 +1,370 @@
 /**
- * homeService.js - Optimized for StudentOS 2026
- * Handles all Firestore operations for the Dashboard.
+ * homeService.js
+ * Complete Firestore backend for the Home/Dashboard page.
+ *
+ * Firestore Collections:
+ *   users/{uid}/tasks/{taskId}
+ *     - title, subject, energyLevel, date, completed, focusTimeSpent, scheduledAt, createdAt
+ *
+ *   users/{uid}/studySessions/{id}
+ *     - subject, duration, hours, focusScore, retention, energy, date, taskId, createdAt
+ *
+ *   users/{uid}/system_logs/{id}
+ *     - message, type ("info" | "alert"), timestamp
+ *
+ *   users/{uid}/neural_assets/brain_dump  (single document)
+ *     - content, lastUpdated / initializedAt
  */
 
 import {
     collection, addDoc, getDocs, updateDoc,
-    query, where, orderBy, doc, Timestamp, limit, onSnapshot
+    query, where, orderBy, doc, Timestamp,
+    setDoc, getDoc, serverTimestamp, onSnapshot
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+
+const TODAY = () => new Date().toISOString().split("T")[0];
+
+// ── SYSTEM LOGS ───────────────────────────────────────────────────────────────
+
+/**
+ * addSystemLog()
+ * Writes an event to the Astra log feed.
+ * type: "info" | "alert"
+ */
+export const addSystemLog = async (uid, message, type = "info") => {
+    if (!uid) return;
+    try {
+        await addDoc(collection(db, "users", uid, "system_logs"), {
+            message,
+            type,
+            timestamp: serverTimestamp(),
+        });
+    } catch (e) {
+        console.error("System log error:", e);
+    }
+};
+
+/**
+ * getSystemLogs()
+ * Returns last N system log entries ordered by timestamp desc.
+ */
+export const getSystemLogs = async (uid, limitCount = 20) => {
+    if (!uid) return [];
+    try {
+        const q = query(
+            collection(db, "users", uid, "system_logs"),
+            orderBy("timestamp", "desc")
+        );
+        const snap = await getDocs(q);
+        return snap.docs
+            .slice(0, limitCount)
+            .map(d => ({ id: d.id, ...d.data() }))
+            .reverse();
+    } catch (e) {
+        console.error("Get logs error:", e);
+        return [];
+    }
+};
+
+/**
+ * subscribeToSystemLogs()
+ * Real-time listener for the Astra log feed.
+ * Returns unsubscribe function.
+ */
+export const subscribeToSystemLogs = (uid, callback, limitCount = 15) => {
+    if (!uid) return () => { };
+    const q = query(
+        collection(db, "users", uid, "system_logs"),
+        orderBy("timestamp", "desc")
+    );
+    return onSnapshot(q, snap => {
+        const logs = snap.docs
+            .slice(0, limitCount)
+            .map(d => ({ id: d.id, ...d.data() }))
+            .reverse();
+        callback(logs);
+    });
+};
+
+// ── TASKS ─────────────────────────────────────────────────────────────────────
+
+/**
+ * addTask()
+ * Creates a new task and logs it to the Astra feed.
+ */
+export const addTask = async (uid, title, subject = "General", options = {}) => {
+    if (!uid) return null;
+    try {
+        const taskRef = collection(db, "users", uid, "tasks");
+        const docRef = await addDoc(taskRef, {
+            title,
+            subject,
+            energyLevel: options.energyLevel || "Medium",
+            energyCost: options.energyCost || "medium",
+            scheduledAt: options.scheduledAt || "09:00",
+            date: options.date || TODAY(),
+            completed: false,
+            focusTimeSpent: 0,
+            createdAt: serverTimestamp(),
+        });
+        await addSystemLog(uid, `Objective acquired: ${title}`, "info");
+        return docRef.id;
+    } catch (e) {
+        console.error("Add task error:", e);
+        return null;
+    }
+};
+
+/**
+ * markTaskComplete()
+ * Marks a task done and logs the event.
+ */
+export const markTaskComplete = async (uid, taskId, taskTitle = "") => {
+    if (!uid || !taskId) return;
+    try {
+        await updateDoc(doc(db, "users", uid, "tasks", taskId), {
+            completed: true,
+            completedAt: serverTimestamp(),
+        });
+        await addSystemLog(uid, `Objective complete: ${taskTitle}`, "info");
+    } catch (e) {
+        console.error("Mark complete error:", e);
+    }
+};
+
+/**
+ * subscribeTodaysTasks()
+ * Real-time listener for today's tasks via onSnapshot.
+ * Returns unsubscribe function.
+ */
+export const subscribeTodaysTasks = (uid, callback) => {
+    if (!uid) return () => { };
+    const q = query(
+        collection(db, "users", uid, "tasks"),
+        where("date", "==", TODAY()),
+        orderBy("scheduledAt", "asc")
+    );
+    return onSnapshot(q, snap => {
+        const tasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        callback(tasks);
+    });
+};
+
+/**
+ * getTodaysTasks()
+ * One-time fetch of today's tasks.
+ */
+export const getTodaysTasks = async (uid) => {
+    if (!uid) return [];
+    try {
+        const q = query(
+            collection(db, "users", uid, "tasks"),
+            where("date", "==", TODAY()),
+            orderBy("scheduledAt", "asc")
+        );
+        const snap = await getDocs(q);
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (e) {
+        console.error("Get tasks error:", e);
+        return [];
+    }
+};
+
+// ── FOCUS SESSIONS ────────────────────────────────────────────────────────────
+
+/**
+ * saveFocusSession()
+ * Saves a completed focus session to studySessions collection.
+ * Also feeds data into the Analysis page.
+ */
+export const saveFocusSession = async (uid, sessionData) => {
+    if (!uid) return;
+    try {
+        await addDoc(collection(db, "users", uid, "studySessions"), {
+            subject: sessionData.subject || "General",
+            duration: sessionData.duration || 25,       // minutes
+            hours: parseFloat(((sessionData.duration || 25) / 60).toFixed(2)),
+            focusScore: sessionData.focusScore || 80,
+            retention: Math.round((sessionData.focusScore || 80) * 0.85),
+            energy: Math.round((sessionData.focusScore || 80) * 0.9),
+            taskId: sessionData.taskId || null,
+            date: TODAY(),
+            createdAt: serverTimestamp(),
+        });
+        await addSystemLog(
+            uid,
+            `Focus session complete: ${sessionData.subject} — ${sessionData.duration}min`,
+            "info"
+        );
+    } catch (e) {
+        console.error("Save session error:", e);
+    }
+};
+
+// ── NEURAL SNAP (BRAIN DUMP) ──────────────────────────────────────────────────
+
+/**
+ * initializeUserAssets()
+ * Creates the brain_dump document if it doesn't exist yet.
+ * Call this once on first login.
+ */
+export const initializeUserAssets = async (uid) => {
+    if (!uid) return;
+    try {
+        const snapRef = doc(db, "users", uid, "neural_assets", "brain_dump");
+        const existing = await getDoc(snapRef);
+        if (!existing.exists()) {
+            await setDoc(snapRef, {
+                content: "",
+                initializedAt: serverTimestamp(),
+            });
+        }
+    } catch (e) {
+        console.error("Init assets error:", e);
+    }
+};
+
+/**
+ * loadNeuralSnap()
+ * Fetches the brain dump content for a user.
+ */
+export const loadNeuralSnap = async (uid) => {
+    if (!uid) return "";
+    try {
+        const snapRef = doc(db, "users", uid, "neural_assets", "brain_dump");
+        const res = await getDoc(snapRef);
+        return res.exists() ? res.data().content || "" : "";
+    } catch (e) {
+        console.error("Load snap error:", e);
+        return "";
+    }
+};
+
+/**
+ * syncNeuralSnap()
+ * Debounced auto-save for the brain dump textarea.
+ * Uses setDoc with merge so it works even if document doesn't exist.
+ */
+export const syncNeuralSnap = async (uid, content) => {
+    if (!uid) return;
+    try {
+        const snapRef = doc(db, "users", uid, "neural_assets", "brain_dump");
+        await setDoc(snapRef, {
+            content,
+            lastUpdated: serverTimestamp(),
+        }, { merge: true });
+    } catch (e) {
+        console.error("Sync snap error:", e);
+    }
+};
 
 // ── DAILY OUTLOOK ─────────────────────────────────────────────────────────────
 
 /**
  * calculateDailyOutlook()
- * Calculates productivity metrics for today.
+ * Derives task completion % and day progress % for the progress bars.
  */
-export async function calculateDailyOutlook(uid) {
-    const today = new Date().toISOString().split("T")[0];
-    const ref = collection(db, "users", uid, "tasks");
-    const q = query(ref, where("date", "==", today));
-
-    const snap = await getDocs(q);
-    const tasks = snap.docs.map(d => d.data());
-
+export const calculateDailyOutlook = async (uid) => {
+    const tasks = await getTodaysTasks(uid);
     const total = tasks.length;
     const completed = tasks.filter(t => t.completed).length;
     const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-    // Optimized Day Progress: 6 AM to 11:59 PM window
     const now = new Date();
-    const startOfDay = new Date(); startOfDay.setHours(6, 0, 0, 0);
-    const endOfDay = new Date(); endOfDay.setHours(23, 59, 59, 999);
-
-    const dayProgressPercent = Math.max(0, Math.min(100, Math.round(
-        ((now - startOfDay) / (endOfDay - startOfDay)) * 100
-    )));
+    const start = new Date(); start.setHours(6, 0, 0, 0);
+    const end = new Date(); end.setHours(24, 0, 0, 0);
+    const dayProgressPercent = Math.min(100, Math.max(0,
+        Math.round(((now - start) / (end - start)) * 100)
+    ));
 
     let status = "Not Started";
     if (percent >= 80) status = "Crushing It";
-    else if (percent >= 50) status = "On Track";
+    else if (percent >= dayProgressPercent) status = "On Track";
     else if (percent >= 20) status = "In Progress";
     else if (total > 0) status = "Falling Behind";
 
     return { status, completedCount: completed, totalCount: total, percent, dayProgressPercent };
-}
+};
 
-// ── TASKS (SUB-COLLECTION PATTERN) ───────────────────────────────────────────
-
-/**
- * getUpcomingTasks()
- * Fetches next 3 non-completed tasks for today.
- */
-export async function getUpcomingTasks(uid) {
-    const today = new Date().toISOString().split("T")[0];
-    const now = new Date();
-    const currentTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-
-    const ref = collection(db, "users", uid, "tasks");
-    const q = query(
-        ref,
-        where("date", "==", today),
-        where("completed", "==", false),
-        orderBy("scheduledAt", "asc")
-    );
-
-    const snap = await getDocs(q);
-    return snap.docs
-        .map(d => ({ id: d.id, ...d.data() }))
-        .filter(t => t.scheduledAt >= currentTime)
-        .slice(0, 3);
-}
+// ── SUBJECT MASTERY ───────────────────────────────────────────────────────────
 
 /**
- * getTodaysTasks()
+ * getSubjectMastery()
+ * Aggregates studySessions by subject to calculate mastery percentages.
+ * Mastery = weighted average of focusScore across sessions, capped at 100.
  */
-export async function getTodaysTasks(uid) {
-    const today = new Date().toISOString().split("T")[0];
-    const ref = collection(db, "users", uid, "tasks");
-    const q = query(ref, where("date", "==", today), orderBy("scheduledAt", "asc"));
-    const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-}
+export const getSubjectMastery = async (uid) => {
+    if (!uid) return [];
+    try {
+        const snap = await getDocs(collection(db, "users", uid, "studySessions"));
+        const sessions = snap.docs.map(d => d.data());
+
+        const subjectMap = {};
+        sessions.forEach(s => {
+            const sub = s.subject || "General";
+            if (!subjectMap[sub]) subjectMap[sub] = { totalScore: 0, count: 0, hours: 0 };
+            subjectMap[sub].totalScore += s.focusScore || 0;
+            subjectMap[sub].count += 1;
+            subjectMap[sub].hours += s.hours || 0;
+        });
+
+        const COLORS = ["#185FA5", "#C9A84C", "#10B981", "#8B5CF6", "#EF4444", "#F59E0B"];
+        return Object.entries(subjectMap)
+            .map(([subject, data], i) => ({
+                subject,
+                percent: Math.min(100, Math.round(data.totalScore / data.count)),
+                hours: parseFloat(data.hours.toFixed(1)),
+                color: COLORS[i % COLORS.length],
+            }))
+            .sort((a, b) => b.percent - a.percent)
+            .slice(0, 5);
+    } catch (e) {
+        console.error("Get mastery error:", e);
+        return [];
+    }
+};
+
+// ── KNOWLEDGE GAPS ────────────────────────────────────────────────────────────
 
 /**
- * addTask()
- * Intelligent task creation.
+ * getKnowledgeGaps()
+ * Returns subjects not studied in 3+ days based on studySessions history.
  */
-export async function addTask(uid, task) {
-    const ref = collection(db, "users", uid, "tasks");
-    const docRef = await addDoc(ref, {
-        ...task,
-        completed: false,
-        createdAt: Timestamp.now(),
-        date: task.date || new Date().toISOString().split("T")[0]
-    });
-    return docRef.id;
-}
+export const getKnowledgeGaps = async (uid) => {
+    if (!uid) return [];
+    try {
+        const snap = await getDocs(collection(db, "users", uid, "studySessions"));
+        const sessions = snap.docs.map(d => d.data());
 
-export async function markTaskComplete(uid, taskId) {
-    const ref = doc(db, "users", uid, "tasks", taskId);
-    await updateDoc(ref, { completed: true });
-}
+        // Latest date per subject
+        const latestMap = {};
+        sessions.forEach(s => {
+            const sub = s.subject;
+            if (!sub || sub === "General") return;
+            if (!latestMap[sub] || s.date > latestMap[sub]) latestMap[sub] = s.date;
+        });
 
-// ── FOCUS & MOMENTUM ──────────────────────────────────────────────────────────
+        const today = new Date();
+        const gaps = [];
+        Object.entries(latestMap).forEach(([subject, lastDate]) => {
+            const last = new Date(lastDate);
+            const daysAgo = Math.floor((today - last) / (1000 * 60 * 60 * 24));
+            if (daysAgo >= 3) {
+                gaps.push({
+                    subject,
+                    daysAgo,
+                    reason: daysAgo >= 5
+                        ? `No sessions in ${daysAgo} days. Exam gap forming.`
+                        : `Retention dropping. Review recommended.`,
+                    priority: daysAgo >= 5 ? "high" : "medium",
+                });
+            }
+        });
 
-/**
- * logFocusSession()
- * Saves focus data to 'studySessions' for the Intelligence Pulse chart.
- */
-export async function logFocusSession(uid, { subject, durationMinutes, focusScore }) {
-    const today = new Date().toISOString().split("T")[0];
-    const ref = collection(db, "users", uid, "studySessions");
-    await addDoc(ref, {
-        date: today,
-        subject,
-        hours: parseFloat((durationMinutes / 60).toFixed(2)),
-        focusScore,
-        retention: Math.round(focusScore * 0.85),
-        energy: Math.round(focusScore * 0.9),
-        createdAt: Timestamp.now(),
-    });
-}
-
-/**
- * getWeeklyMomentum()
- * Calculates the Momentum Score (Consistency + Volume + Quality).
- */
-export async function getWeeklyMomentum(uid) {
-    const dates = [];
-    for (let i = 6; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        dates.push(d.toISOString().split("T")[0]);
+        return gaps.sort((a, b) => b.daysAgo - a.daysAgo).slice(0, 3);
+    } catch (e) {
+        console.error("Get gaps error:", e);
+        return [];
     }
-
-    const ref = collection(db, "users", uid, "studySessions");
-    const q = query(ref, where("date", ">=", dates[0]), where("date", "<=", dates[6]));
-    const snap = await getDocs(q);
-    const sessions = snap.docs.map(d => d.data());
-
-    const dayMap = {};
-    dates.forEach(d => { dayMap[d] = { hours: 0, focusSum: 0, count: 0 }; });
-    sessions.forEach(s => {
-        if (!dayMap[s.date]) return;
-        dayMap[s.date].hours += s.hours || 0;
-        dayMap[s.date].focusSum += s.focusScore || 0;
-        dayMap[s.date].count += 1;
-    });
-
-    const chartData = dates.map(d => ({
-        day: new Date(d).toLocaleDateString("en", { weekday: "short" }),
-        hours: parseFloat(dayMap[d].hours.toFixed(1)),
-        focus: dayMap[d].count ? Math.round(dayMap[d].focusSum / dayMap[d].count) : 0,
-    }));
-
-    const activeDays = Object.values(dayMap).filter(d => d.hours > 0).length;
-    const totalHours = Object.values(dayMap).reduce((s, d) => s + d.hours, 0);
-    const avgHours = totalHours / 7;
-    const allSessions = Object.values(dayMap).filter(d => d.count > 0);
-    const avgFocus = allSessions.length
-        ? allSessions.reduce((s, d) => s + d.focusSum / d.count, 0) / allSessions.length
-        : 0;
-
-    const score = Math.round(
-        (activeDays / 7) * 40 +
-        (Math.min(avgHours, 4) / 4) * 40 +
-        (avgFocus / 100) * 20
-    );
-
-    return { score, chartData, activeDays, totalHours: parseFloat(totalHours.toFixed(1)) };
-}
-
-// ── COMMAND UTILITIES ─────────────────────────────────────────────────────────
-
-export function parseCommand(input) {
-    const text = input.trim();
-    const timeRegex = /\b(\d{1,2}(:\d{2})?\s?(am|pm)|(\d{2}:\d{2}))\b/i;
-    const taskKeywords = /\b(remind|schedule|study|review|complete|finish|meet|call|gym|workout|read)\b/i;
-    const insightKeywords = /^(note:|insight:|think:|feel:)/i;
-
-    if (insightKeywords.test(text)) {
-        return { type: "insight", content: text.replace(insightKeywords, "").trim() };
-    }
-    if (timeRegex.test(text) || taskKeywords.test(text)) {
-        const timeMatch = text.match(timeRegex);
-        let timeStr = timeMatch ? timeMatch[0] : "12:00";
-        // Simple normalization: convert '8pm' style to '20:00'
-        if (timeStr.toLowerCase().includes('pm') && !timeStr.includes('12')) {
-            let [h] = timeStr.split(/[:am|pm]/);
-            timeStr = `${parseInt(h) + 12}:00`;
-        } else if (timeStr.toLowerCase().includes('am') && timeStr.includes('12')) {
-            timeStr = "00:00";
-        }
-        const title = text.replace(timeRegex, "").replace(taskKeywords, "").trim();
-        return { type: "task", title: title || "New Task", scheduledAt: timeStr, raw: text };
-    }
-    return { type: "note", content: text };
-}
-
-// ── AGENTIC INFERENCE ─────────────────────────────────────────────────────────
-
-export function generateAIInference({ outlookPercent, activeDays, totalHoursToday, currentHour, upcomingTasks }) {
-    const tips = [];
-    if (totalHoursToday === 0 && currentHour >= 11) {
-        tips.push({ type: "ALERT", msg: "Morning momentum is missing. A 15-min 'Warmup' session is recommended." });
-    }
-    if (activeDays >= 5) {
-        tips.push({ type: "INSIGHT", msg: "High consistency detected. You are currently in a 'Flow State' week." });
-    }
-    if (upcomingTasks?.length > 2) {
-        tips.push({ type: "ANALYSIS", msg: "Afternoon density is high. Consider moving one task to 'Low Energy' mode." });
-    }
-    if (tips.length === 0) {
-        tips.push({ type: "SYSTEM", msg: "Neural Hub synchronized. Performance metrics are optimal." });
-    }
-    return tips;
-}
+};
