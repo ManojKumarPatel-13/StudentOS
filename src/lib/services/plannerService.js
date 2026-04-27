@@ -198,7 +198,7 @@ export const updateChatSuggestion = async (uid, chatId, accepted) => {
 export const updateTaskMatrix = async (uid, taskId, urgent, important) => {
     if (!uid || !taskId) return;
     try {
-        await updateDoc(doc(db, "users", uid, "plannerTasks", taskId), {
+        await updateDoc(doc(db, "users", uid, "tasks", taskId), {
             urgent,
             important,
             updatedAt: serverTimestamp(),
@@ -215,7 +215,7 @@ export const rescheduleDay = async (uid, reason = "Sick") => {
 
         // Fetch all incomplete tasks for today
         const q = query(
-            collection(db, "users", uid, "plannerTasks"),
+            collection(db, "users", uid, "tasks"),
             where("date", "==", today),
             where("completed", "==", false)
         );
@@ -262,7 +262,7 @@ export const rescheduleDay = async (uid, reason = "Sick") => {
         const { writeBatch } = await import("firebase/firestore");
         const batch = writeBatch(db);
         dayAssignments.forEach(({ id, date }) => {
-            batch.update(doc(db, "users", uid, "plannerTasks", id), {
+            batch.update(doc(db, "users", uid, "tasks", id), {
                 date,
                 rescheduledFrom: today,
                 rescheduledReason: reason,
