@@ -34,6 +34,21 @@ export default function QuizPlay() {
     return () => clearInterval(timer);
   }, [current, finished]);
 
+  useEffect(() => {
+    if (!examMode) return;
+    document.documentElement.requestFullscreen?.().catch(() => { });
+    const block = e => e.preventDefault();
+    document.addEventListener("copy", block);
+    document.addEventListener("paste", block);
+    document.addEventListener("cut", block);
+    return () => {
+      document.exitFullscreen?.().catch(() => { });
+      document.removeEventListener("copy", block);
+      document.removeEventListener("paste", block);
+      document.removeEventListener("cut", block);
+    };
+  }, [examMode]);
+
   // ANSWER
   const handleAnswer = (opt) => {
     if (showResult) return;
@@ -113,9 +128,8 @@ export default function QuizPlay() {
                   return (
                     <tr
                       key={i}
-                      className={`border-t ${
-                        correct ? "bg-green-500/10" : "bg-red-500/10"
-                      }`}
+                      className={`border-t ${correct ? "bg-green-500/10" : "bg-red-500/10"
+                        }`}
                     >
                       <td className="p-3">{i + 1}</td>
                       <td className="p-3">{answers[i] || "—"}</td>
