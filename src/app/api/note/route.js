@@ -1,6 +1,10 @@
 export async function POST(req) {
   try {
-    const { topic } = await req.json();
+    const { topic, mode } = await req.json();
+
+    const systemPrompt = mode === "summary"
+      ? "You are a study assistant. Condense the following topic into exactly 5 bullet points. Each bullet must be under 20 words. Label them as: Key Concept, Why It Matters, Remember This, Common Mistake, Exam Tip."
+      : "Generate clean structured notes with headings and bullet points. Keep it simple and exam-friendly.";
 
     if (!topic) {
       throw new Error("Topic is required");
@@ -17,15 +21,8 @@ export async function POST(req) {
         body: JSON.stringify({
           model: "mistralai/mistral-7b-instruct:free",
           messages: [
-            {
-              role: "system",
-              content:
-                "Generate clean structured notes with headings and bullet points. Keep it simple and exam-friendly.",
-            },
-            {
-              role: "user",
-              content: topic,
-            },
+            { role: "system", content: systemPrompt },
+            { role: "user", content: topic },
           ],
         }),
       }

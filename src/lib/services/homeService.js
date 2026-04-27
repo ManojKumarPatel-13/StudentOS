@@ -22,6 +22,7 @@ import {
     setDoc, getDoc, serverTimestamp, onSnapshot
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { recalculateStats, generateAndSaveAILogs } from "@/lib/services/analysisService";
 
 const TODAY = () => new Date().toISOString().split("T")[0];
 
@@ -120,7 +121,7 @@ export const addTask = async (uid, title, subject = "General", options = {}) => 
  * markTaskComplete()
  * Marks a task done and logs the event.
  */
-export const markTaskComplete = async (uid, taskId, taskTitle = "") => {
+export const markTaskComplete = async (uid, taskId, taskTitle = "", taskSubject = "General") => {
     if (!uid || !taskId) return;
     try {
         await updateDoc(doc(db, "users", uid, "tasks", taskId), {
@@ -128,6 +129,23 @@ export const markTaskComplete = async (uid, taskId, taskTitle = "") => {
             completedAt: serverTimestamp(),
         });
         await addSystemLog(uid, `Objective complete: ${taskTitle}`, "info");
+
+        await addDoc(collection(db, "users", uid, "studySessions"), {
+            subject: taskSubject,
+            duration: 30,
+            hours: 0.5,
+            focusScore: 75,
+            retention: Math.round(75 * 0.85),
+            energy: Math.round(75 * 0.9),
+            taskId,
+            date: TODAY(),
+            source: "task_completion",   // lets analysis filter these out if needed
+            createdAt: serverTimestamp(),
+        });
+
+        // update streak + totalHours in meta/stats
+        await recalculateStats(uid);
+
     } catch (e) {
         console.error("Mark complete error:", e);
     }
@@ -186,6 +204,7 @@ export const saveFocusSession = async (uid, sessionData) => {
             duration: sessionData.duration || 25,       // minutes
             hours: parseFloat(((sessionData.duration || 25) / 60).toFixed(2)),
             focusScore: sessionData.focusScore || 80,
+            startHour: new Date().getHours(),
             retention: Math.round((sessionData.focusScore || 80) * 0.85),
             energy: Math.round((sessionData.focusScore || 80) * 0.9),
             taskId: sessionData.taskId || null,
@@ -197,6 +216,11 @@ export const saveFocusSession = async (uid, sessionData) => {
             `Focus session complete: ${sessionData.subject} — ${sessionData.duration}min`,
             "info"
         );
+
+        // GAP 3 FIX — update meta/stats and generate AI logs after every session
+        await recalculateStats(uid);
+        await generateAndSaveAILogs(uid);   // fires AI observations in background
+
     } catch (e) {
         console.error("Save session error:", e);
     }
@@ -334,10 +358,12 @@ export const getSubjectMastery = async (uid) => {
 export const getKnowledgeGaps = async (uid) => {
     if (!uid) return [];
     try {
-        const snap = await getDocs(collection(db, "users", uid, "studySessions"));
-        const sessions = snap.docs.map(d => d.data());
+        const gapMap = {}; // subject → { daysAgo, reason, priority }
 
-        // Latest date per subject
+        // SOURCE 1 — subjects not studied in 3+ days (from focus sessions)
+        const sessionSnap = await getDocs(collection(db, "users", uid, "studySessions"));
+        const sessions = sessionSnap.docs.map(d => d.data());
+
         const latestMap = {};
         sessions.forEach(s => {
             const sub = s.subject;
@@ -346,23 +372,54 @@ export const getKnowledgeGaps = async (uid) => {
         });
 
         const today = new Date();
-        const gaps = [];
         Object.entries(latestMap).forEach(([subject, lastDate]) => {
-            const last = new Date(lastDate);
-            const daysAgo = Math.floor((today - last) / (1000 * 60 * 60 * 24));
+            const daysAgo = Math.floor((today - new Date(lastDate)) / (1000 * 60 * 60 * 24));
             if (daysAgo >= 3) {
-                gaps.push({
+                gapMap[subject] = {
                     subject,
                     daysAgo,
                     reason: daysAgo >= 5
                         ? `No sessions in ${daysAgo} days. Exam gap forming.`
                         : `Retention dropping. Review recommended.`,
                     priority: daysAgo >= 5 ? "high" : "medium",
-                });
+                };
             }
         });
 
-        return gaps.sort((a, b) => b.daysAgo - a.daysAgo).slice(0, 3);
+        // SOURCE 2 — subjects with quiz score below 60% (from quizResults)
+        const quizSnap = await getDocs(collection(db, "users", uid, "quizResults"));
+        const quizResults = quizSnap.docs.map(d => d.data());
+
+        const quizMap = {}; // subject → { totalPercent, count }
+        quizResults.forEach(r => {
+            const sub = r.topic;
+            if (!sub) return;
+            if (!quizMap[sub]) quizMap[sub] = { totalPercent: 0, count: 0 };
+            quizMap[sub].totalPercent += r.percent || 0;
+            quizMap[sub].count += 1;
+        });
+
+        Object.entries(quizMap).forEach(([subject, data]) => {
+            const avgScore = Math.round(data.totalPercent / data.count);
+            if (avgScore < 60 && !gapMap[subject]) {
+                // Only add if not already flagged by session gap
+                gapMap[subject] = {
+                    subject,
+                    daysAgo: 0,
+                    reason: `Quiz avg ${avgScore}% — below mastery threshold. Needs review.`,
+                    priority: avgScore < 40 ? "high" : "medium",
+                };
+            }
+        });
+
+        return Object.values(gapMap)
+            .sort((a, b) => {
+                // High priority first, then by daysAgo
+                if (a.priority !== b.priority) return a.priority === "high" ? -1 : 1;
+                return b.daysAgo - a.daysAgo;
+            })
+            .slice(0, 3);
+
     } catch (e) {
         console.error("Get gaps error:", e);
         return [];

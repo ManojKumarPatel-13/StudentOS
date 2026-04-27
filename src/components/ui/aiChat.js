@@ -2,12 +2,20 @@
 import React, { useState } from 'react';
 import { Plus, Folder, MessageSquare, MoreHorizontal, Send, Settings, Bell, Maximize2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { generatePlan } from "@/lib/gemini";
+import { startChatSession, sendChatMessage } from "@/lib/gemini";
+import { saveChatMessage, loadChatHistory } from "@/lib/services/aiServices";
+import { useAuth } from "@/context/authContext";
+import { detectBurnoutRisk, getWeakSubjects } from "@/lib/services/mentorService";
+import { computeTimeOfDayStats, computeConsistencyScore } from "@/lib/services/analysisService";
 
 export default function PlannerChat() {
+    const { user } = useAuth();
+    const uid = user?.uid;
+
     const [input, setInput] = useState("");
     const [chatHistory, setChatHistory] = useState([]);
     const [isThinking, setIsThinking] = useState(false);
+    const [realityCheck, setRealityCheck] = useState(true);
 
     const scrollRef = React.useRef(null);
 
@@ -20,6 +28,7 @@ export default function PlannerChat() {
         }
     }, [chatHistory]); // Runs every time a message is added
 
+    // AFTER
     const handleSend = async () => {
         if (!input.trim()) return;
         const userQ = input;
@@ -29,23 +38,76 @@ export default function PlannerChat() {
         setIsThinking(true);
 
         try {
-            // 2. Call the REAL Gemini Brain
-            // This 'await' tells the code to wait until Google sends the answer back
-            const aiResponse = await generatePlan(userQ);
+            // Reality Check — intercept before hitting API
+            if (realityCheck) {
+                const warning = detectBurnoutRisk(userQ);
+                if (warning) {
+                    setChatHistory(prev => {
+                        const updated = [...prev];
+                        updated[updated.length - 1].a = warning;
+                        return updated;
+                    });
+                    if (uid) await saveChatMessage(uid, { role: "model", text: warning });
+                    setIsThinking(false);
+                    return;
+                }
+            }
 
-            // 3. Find the last item (the one with a: null) and fill it with the real AI text
+            // Load Firestore history for memory
+            let pastMessages = [];
+            if (uid) {
+                const past = await loadChatHistory(uid);
+                pastMessages = past.map(m => ({ role: m.role, text: m.text }));
+            }
+
+            const messages = [...pastMessages, { role: "user", text: userQ }];
+
+            // AUTO-INJECT context when user asks about planning
+            const planningKeywords = ["plan my day", "what should i study", "schedule", "study plan"];
+            const isPlanningQuery = planningKeywords.some(k => userQ.toLowerCase().includes(k));
+
+            let systemContext = {};
+            if (isPlanningQuery && uid) {
+                const [weak, time, consistency] = await Promise.all([
+                    getWeakSubjects(uid).catch(() => []),
+                    computeTimeOfDayStats(uid).catch(() => null),
+                    computeConsistencyScore(uid).catch(() => 0),
+                ]);
+                systemContext = {
+                    weakSubjects: weak,
+                    bestStudyWindow: time?.bestWindow,
+                    consistencyScore: consistency,
+                };
+            }
+
+            const res = await fetch("/api/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ messages, systemContext }),
+            });
+
+            const data = await res.json();
+            const aiResponse = data.reply || "I encountered an error. Please try again.";
+
+            if (uid) {
+                await saveChatMessage(uid, { role: "user", text: userQ });
+                await saveChatMessage(uid, { role: "model", text: aiResponse });
+            }
+
             setChatHistory(prev => {
                 const updated = [...prev];
                 updated[updated.length - 1].a = aiResponse;
                 return updated;
             });
-        } catch (error) {
-            console.error("Error calling Gemini:", error);
-            // Optional: Show an error message in the chat
-        } finally {
-            // Stop the "Thinking" animation regardless of success or failure
-            setIsThinking(false);
+        } catch {
+            setChatHistory(prev => {
+                const updated = [...prev];
+                updated[updated.length - 1].a = "I encountered an error. Please try again.";
+                return updated;
+            });
         }
+
+        setIsThinking(false);
     };
 
     return (
@@ -112,6 +174,16 @@ export default function PlannerChat() {
                         <div className="w-2.5 h-2.5 rounded-full border border-[#185FA5]/40 hover:bg-[#C9A84C]/40 cursor-pointer" />
                         <div className="w-2.5 h-2.5 rounded-full border border-[#185FA5]/40 hover:bg-[#C9A84C]/40 cursor-pointer" />
                     </div>
+                    <button
+                        onClick={() => setRealityCheck(r => !r)}
+                        className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold transition-all"
+                        style={{
+                            background: realityCheck ? "rgba(239,68,68,0.1)" : "rgba(255,255,255,0.05)",
+                            border: `1px solid ${realityCheck ? "rgba(239,68,68,0.3)" : "rgba(255,255,255,0.1)"}`,
+                            color: realityCheck ? "#EF4444" : "rgba(255,255,255,0.3)",
+                        }}>
+                        ⚠ Reality Check {realityCheck ? "ON" : "OFF"}
+                    </button>
                 </header>
 
                 {/* Chat Feed */}

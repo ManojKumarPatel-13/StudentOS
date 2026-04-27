@@ -30,7 +30,7 @@ export default function Onboarding() {
                     onboardingComplete: true,
                     createdAt: new Date(),
                     currentStatus: "On Track"
-                });
+                }, { merge: true });
                 router.push('/home');
             } catch (error) {
                 console.error("Schema Write Error:", error);

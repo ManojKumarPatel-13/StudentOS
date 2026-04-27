@@ -16,7 +16,11 @@ import {
     subscribeTodaysPlannerChat,
     saveChatMessage,
     updateChatSuggestion,
+    updateTaskMatrix,
+    rescheduleDay
 } from "@/lib/services/plannerService";
+import { getWeakSubjects } from "@/lib/services/mentorService";
+import { computeTimeOfDayStats, computeConsistencyScore } from "@/lib/services/analysisService";
 
 // ── THEME ─────────────────────────────────────────────────────────────────────
 const C = {
@@ -67,7 +71,7 @@ function confidenceColor(c) {
 }
 
 // ── TASK CARD ─────────────────────────────────────────────────────────────────
-function TaskCard({ task, isActive, onComplete, onExpand, onDelete, expanded, isFirestore }) {
+function TaskCard({ task, isActive, onComplete, onExpand, onDelete, expanded, isFirestore, onMatrixToggle }) {
     const ts = TYPE_STYLES[task.type] || TYPE_STYLES.light;
     const isBreak = task.type === "break";
 
@@ -80,7 +84,8 @@ function TaskCard({ task, isActive, onComplete, onExpand, onDelete, expanded, is
             >
                 <Coffee size={14} color={C.success} />
                 <span className="text-[13px] font-semibold" style={{ color: C.success }}>{task.title}</span>
-                <span className="text-[11px] font-mono ml-auto" style={{ color: C.muted }}>{task.time} – {task.end}</span>
+                <span className="text-[11px] font-mono ml-auto" style={{ color: C.muted }}>{task.time || task.scheduledAt} – {task.end || ""}
+                </span>
                 {isFirestore && (
                     <button onClick={e => { e.stopPropagation(); onDelete(task.id); }}
                         className="ml-2 opacity-30 hover:opacity-80 transition-opacity border-none bg-transparent cursor-pointer">
@@ -111,9 +116,34 @@ function TaskCard({ task, isActive, onComplete, onExpand, onDelete, expanded, is
                                 style={{ color: CATEGORY_COLORS[task.category] || C.muted }}>
                                 {task.category}
                             </span>
+
                             {task.type === "ai" && (
                                 <span className="text-[9px] font-mono px-1.5 py-px rounded"
                                     style={{ color: C.muted, border: `1px dashed ${C.border}` }}>AI</span>
+                            )}
+
+                            // ADD after the category color dot and category text
+                            {!isBreak && (
+                                <>
+                                    <span
+                                        onClick={e => { e.stopPropagation(); onMatrixToggle?.(task.id, !task.urgent, task.important); }}
+                                        title="Toggle Urgent"
+                                        className="text-[8px] font-mono px-1.5 py-px rounded cursor-pointer transition-all"
+                                        style={{
+                                            background: task.urgent ? "rgba(239,68,68,0.15)" : "rgba(255,255,255,0.04)",
+                                            border: `1px solid ${task.urgent ? "rgba(239,68,68,0.4)" : C.border}`,
+                                            color: task.urgent ? "#EF4444" : C.dim,
+                                        }}>U</span>
+                                    <span
+                                        onClick={e => { e.stopPropagation(); onMatrixToggle?.(task.id, task.urgent, !task.important); }}
+                                        title="Toggle Important"
+                                        className="text-[8px] font-mono px-1.5 py-px rounded cursor-pointer transition-all"
+                                        style={{
+                                            background: task.important ? "rgba(201,168,76,0.15)" : "rgba(255,255,255,0.04)",
+                                            border: `1px solid ${task.important ? "rgba(201,168,76,0.4)" : C.border}`,
+                                            color: task.important ? C.gold : C.dim,
+                                        }}>I</span>
+                                </>
                             )}
                         </div>
                         <h4 className="text-[14px] font-bold m-0 tracking-[-0.01em]"
@@ -274,6 +304,90 @@ function VectorView({ tasks }) {
     );
 }
 
+function MatrixView({ tasks, onMatrixToggle, onComplete, onDelete, uid }) {
+    const draggingId = React.useRef(null);
+
+    const quadrants = [
+        { label: "Do First", sub: "Urgent + Important", urgent: true, important: true, color: "#EF4444", bg: "rgba(239,68,68,0.05)" },
+        { label: "Schedule", sub: "Important, Not Urgent", urgent: false, important: true, color: "#C9A84C", bg: "rgba(201,168,76,0.05)" },
+        { label: "Delegate", sub: "Urgent, Not Important", urgent: true, important: false, color: "#185FA5", bg: "rgba(24,95,165,0.05)" },
+        { label: "Eliminate", sub: "Neither", urgent: false, important: false, color: "#6B7280", bg: "rgba(107,114,128,0.05)" },
+    ];
+
+    return (
+        <div className="grid grid-cols-2 gap-3 h-full p-1">
+            {quadrants.map(q => {
+                const qtasks = tasks.filter(t =>
+                    (t.urgent ?? false) === q.urgent &&
+                    (t.important ?? true) === q.important
+                );
+                return (
+                    <div key={q.label}
+                        className="rounded-2xl p-4 flex flex-col gap-2 min-h-[250px]"
+                        style={{ background: q.bg, border: `1px solid ${q.color}25` }}
+                        onDragOver={e => e.preventDefault()}
+                        onDrop={() => {
+                            if (draggingId.current)
+                                onMatrixToggle(draggingId.current, q.urgent, q.important);
+                            draggingId.current = null;
+                        }}>
+
+                        <div className="mb-1">
+                            <p className="text-[11px] font-bold m-0" style={{ color: q.color }}>{q.label}</p>
+                            <p className="text-[9px] font-mono m-0 mt-0.5" style={{ color: "rgba(245,240,232,0.3)" }}>{q.sub}</p>
+                        </div>
+
+                        {qtasks.length === 0 && (
+                            <p className="text-[10px] font-mono text-center mt-4"
+                                style={{ color: "rgba(245,240,232,0.15)" }}>
+                                Drop tasks here
+                            </p>
+                        )}
+
+                        {qtasks.map(task => (
+                            <div key={task.id}
+                                draggable
+                                onDragStart={() => { draggingId.current = task.id; }}
+                                className="px-3 py-2 rounded-xl cursor-grab active:cursor-grabbing transition-all"
+                                style={{
+                                    background: "rgba(12,45,94,0.6)",
+                                    border: `1px solid ${q.color}30`,
+                                    opacity: task.completed ? 0.4 : 1,
+                                }}>
+                                <div className="flex items-start justify-between gap-2">
+                                    <p className="text-[12px] font-semibold m-0 leading-snug flex-1"
+                                        style={{
+                                            color: task.completed ? "rgba(245,240,232,0.3)" : "white",
+                                            textDecoration: task.completed ? "line-through" : "none"
+                                        }}>
+                                        {task.title}
+                                    </p>
+                                    <div className="flex gap-1 flex-shrink-0">
+                                        <button onClick={() => onComplete(task.id)}
+                                            className="p-1 rounded-lg border-none cursor-pointer transition-all"
+                                            style={{ background: "rgba(16,185,129,0.1)", color: "#10B981" }}>
+                                            <CheckCircle2 size={10} />
+                                        </button>
+                                        <button onClick={() => onDelete(task.id)}
+                                            className="p-1 rounded-lg border-none cursor-pointer transition-all"
+                                            style={{ background: "rgba(239,68,68,0.08)", color: "#EF4444" }}>
+                                            <Trash2 size={10} />
+                                        </button>
+                                    </div>
+                                </div>
+                                <p className="text-[9px] font-mono mt-1 m-0"
+                                    style={{ color: "rgba(245,240,232,0.3)" }}>
+                                    {task.time} · {task.category}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+
 // ── MAIN PAGE ─────────────────────────────────────────────────────────────────
 export default function PlannerPage() {
     const { user } = useAuth();
@@ -290,8 +404,13 @@ export default function PlannerPage() {
     const [isThinking, setIsThinking] = useState(false);
     const [nowMinutes, setNowMinutes] = useState(getNowMinutes());
     const [addingTask, setAddingTask] = useState(false);
-    const [newTask, setNewTask] = useState({ title: "", time: "", end: "", energy: "Medium", category: "Study", type: "light", subtasks: "" });
+    const [newTask, setNewTask] = useState({ title: "", time: "", end: "", energy: "Medium", category: "Study", type: "light", subtasks: "", urgent: false, important: true });
     const chatRef = useRef(null);
+    const [dayStatus, setDayStatus] = useState("Normal");
+    const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+    const [pendingStatus, setPendingStatus] = useState(null);
+    const [rescheduling, setRescheduling] = useState(false);
+    const [generatingDay, setGeneratingDay] = useState(false);
 
     // ── Real-time task listener ──
     useEffect(() => {
@@ -384,6 +503,94 @@ export default function PlannerPage() {
         setNewTask({ title: "", time: "", end: "", energy: "Medium", category: "Study", type: "light", subtasks: "" });
     };
 
+    const handleGenerateDay = async () => {
+        if (!uid || generatingDay) return;
+        setGeneratingDay(true);
+
+        try {
+            // Collect cross-feature context
+            const [weakSubjects, timeStats, consistency] = await Promise.all([
+                getWeakSubjects(uid),
+                computeTimeOfDayStats(uid),
+                computeConsistencyScore(uid),
+            ]);
+
+            const existingTitles = tasks.map(t => t.title).join(", ") || "none";
+            const bestWindow = timeStats?.bestWindow || "Morning";
+            const weakStr = weakSubjects.length ? weakSubjects.join(", ") : "none detected";
+
+            const prompt = `You are Astra, a student planner AI. Generate a full study day schedule.
+
+Student context:
+- Weak subjects needing attention: ${weakStr}
+- Best productivity window: ${bestWindow}
+- Consistency score: ${consistency}/100
+- Tasks already planned today: ${existingTitles}
+
+Rules:
+1. Schedule weak subjects during the best productivity window.
+2. Include at least one break.
+3. Keep sessions 45–90 minutes max.
+4. Return ONLY a JSON array of tasks, no extra text:
+[{"title":"...","time":"HH:MM","end":"HH:MM","energy":"Low|Medium|High","category":"Study|Coding|Health|Admin|Other","type":"deep|light|break"}]`;
+
+            const res = await fetch("/api/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ messages: [{ role: "user", text: prompt }] }),
+            });
+
+            const data = await res.json();
+            const raw = data.reply?.replace(/```json|```/g, "").trim() || "[]";
+
+            let generated = [];
+            try {
+                const parsed = JSON.parse(raw.startsWith("[") ? raw : "[]");
+                generated = Array.isArray(parsed) ? parsed : [];
+            } catch { generated = []; }
+
+            if (!generated.length) {
+                await saveChatMessage(uid, {
+                    role: "ai",
+                    text: "I couldn't generate a plan right now. Try adding a few tasks manually first.",
+                    suggestion: null,
+                });
+                setGeneratingDay(false);
+                return;
+            }
+
+            // Save each task to Firestore
+            for (const task of generated) {
+                await addPlannerTask(uid, {
+                    ...task,
+                    confidence: 88,
+                    subtasks: [],
+                    type: task.type || "light",
+                });
+            }
+
+            await saveChatMessage(uid, {
+                role: "ai",
+                text: `Generated ${generated.length} tasks for your day. ${weakSubjects.length ? `I prioritised your weak areas: ${weakSubjects.slice(0, 2).join(" and ")}.` : ""} Scheduled around your best window: ${bestWindow}. 🗓️`,
+                suggestion: null,
+            });
+
+        } catch (e) {
+            console.error("handleGenerateDay error:", e);
+        }
+
+        setGeneratingDay(false);
+    };
+
+    const handleMatrixToggle = async (taskId, urgent, important) => {
+        if (!uid) return;
+        // Optimistic update
+        setTasks(prev => prev.map(t =>
+            t.id === taskId ? { ...t, urgent, important } : t
+        ));
+        await updateTaskMatrix(uid, taskId, urgent, important);
+    };
+
     const handleCommand = async (e) => {
         e.preventDefault();
         if (!command.trim() || !uid) return;
@@ -391,23 +598,65 @@ export default function PlannerPage() {
         const cmd = command;
         setCommand("");
 
-        // Save user message
         await saveChatMessage(uid, { role: "user", text: cmd, suggestion: null });
 
         setIsThinking(true);
         try {
-            const res = await generatePlan(
-                `You are a student schedule AI called Astra. The user says: "${cmd}". Reply in 1-2 short, helpful sentences. Be concise and action-oriented.`
-            );
-            const aiText = res?.substring(0, 200) || "Schedule noted. I'll optimize accordingly.";
 
-            await saveChatMessage(uid, { role: "ai", text: aiText, suggestion: null });
+            // AFTER — update the prompt to include student context
+            const weakSubjects = uid ? await getWeakSubjects(uid).catch(() => []) : [];
+            const timeStats = uid ? await computeTimeOfDayStats(uid).catch(() => null) : null;
+
+            const prompt = `You are Astra, a student planner AI.
+Student weak subjects: ${weakSubjects.join(", ") || "none"}.
+Best study window: ${timeStats?.bestWindow || "not yet determined"}.
+
+The user says: "${cmd}"
+
+If the user is asking to add, schedule, or create a task — respond ONLY with this JSON (no extra text):
+{"action":"add_task","task":{"title":"...","time":"HH:MM","end":"HH:MM","energy":"Low|Medium|High","category":"Study|Coding|Health|Admin|Other","type":"deep|light|break"},"reply":"one sentence confirming what you added"}
+
+If asking anything else — reply in 1-2 helpful sentences as plain text. Personalise the response using their weak subjects or study window where relevant.`;
+
+            const res = await generatePlan(prompt);
+            const raw = res?.trim() || "";
+
+            // Try to parse as JSON first
+            let parsed = null;
+            try {
+                // Gemini sometimes wraps in ```json ... ```
+                const cleaned = raw.replace(/```json|```/g, "").trim();
+                if (cleaned.startsWith("{")) parsed = JSON.parse(cleaned);
+            } catch {
+                parsed = null;
+            }
+
+            if (parsed?.action === "add_task" && parsed.task?.title) {
+                // Actually create the task in Firestore
+                await addPlannerTask(uid, {
+                    title: parsed.task.title,
+                    time: parsed.task.time || "09:00",
+                    end: parsed.task.end || "10:00",
+                    energy: parsed.task.energy || "Medium",
+                    category: parsed.task.category || "Study",
+                    type: parsed.task.type || "light",
+                    confidence: 85,
+                    subtasks: [],
+                });
+
+                const confirmText = parsed.reply || `Added "${parsed.task.title}" at ${parsed.task.time}.`;
+                await saveChatMessage(uid, { role: "ai", text: `✓ ${confirmText}`, suggestion: null });
+            } else {
+                // Plain text reply
+                const aiText = raw.substring(0, 300) || "Schedule noted. I'll optimize accordingly.";
+                await saveChatMessage(uid, { role: "ai", text: aiText, suggestion: null });
+            }
+
         } catch {
             await saveChatMessage(uid, { role: "ai", text: "Understood. Schedule updated.", suggestion: null });
         }
         setIsThinking(false);
     };
-
     const handleSuggestionResponse = async (chatId, accepted) => {
         if (!uid) return;
         await updateChatSuggestion(uid, chatId, accepted);
@@ -453,7 +702,7 @@ export default function PlannerPage() {
 
                 {/* ── TOP BAR ── */}
                 <header className="flex items-center gap-4 px-5 py-3 shrink-0 backdrop-blur-[12px]"
-                    style={{ borderBottom: `1px solid ${C.border}`, background: "rgba(10,22,40,0.8)" }}>
+                    style={{ borderBottom: `1px solid ${C.border}`, background: "rgba(10,22,40,0.8f)" }}>
 
                     <div className="flex items-center gap-2.5">
                         <h2 className="text-[15px] font-bold m-0 tracking-[-0.01em]">Today's Timeline</h2>
@@ -489,6 +738,7 @@ export default function PlannerPage() {
                         style={{ background: "rgba(12,45,94,0.5)", border: `1px solid ${C.border}` }}>
                         {[
                             { key: "timeline", icon: <Activity size={13} />, label: "Timeline" },
+                            { key: "matrix", icon: <Target size={13} />, label: "Matrix" },
                             { key: "calendar", icon: <Calendar size={13} />, label: "Calendar" },
                             { key: "vector", icon: <BarChart2 size={13} />, label: "Vector" },
                         ].map(v => (
@@ -509,6 +759,33 @@ export default function PlannerPage() {
                         style={{ background: "rgba(201,168,76,0.1)", border: `1px solid ${C.borderGold}`, color: C.gold }}>
                         <Plus size={13} /> Add Task
                     </button>
+
+                    <button
+                        onClick={handleGenerateDay}
+                        disabled={generatingDay}
+                        className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-[10px] text-[11px] font-bold cursor-pointer transition-all"
+                        style={{
+                            background: generatingDay ? "rgba(139,92,246,0.05)" : "rgba(139,92,246,0.12)",
+                            border: "1px solid rgba(139,92,246,0.3)",
+                            color: generatingDay ? "rgba(139,92,246,0.4)" : "#8B5CF6",
+                        }}>
+                        <Brain size={13} />
+                        {generatingDay ? "Building..." : "Generate My Day"}
+                    </button>
+
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowRescheduleModal(true)}
+                            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-[10px] text-[11px] font-bold cursor-pointer transition-all"
+                            style={{
+                                background: dayStatus !== "Normal" ? "rgba(239,68,68,0.1)" : "rgba(255,255,255,0.04)",
+                                border: `1px solid ${dayStatus !== "Normal" ? "rgba(239,68,68,0.3)" : C.border}`,
+                                color: dayStatus !== "Normal" ? "#EF4444" : C.muted,
+                            }}>
+                            <Activity size={13} />
+                            Day: {dayStatus}
+                        </button>
+                    </div>
                 </header>
 
                 {/* ── ADD TASK MODAL ── */}
@@ -564,6 +841,31 @@ export default function PlannerPage() {
                                 ))}
                             </div>
 
+                            // ADD this after the 3 existing select columns
+                            <div className="col-span-3 grid grid-cols-2 gap-2 mt-1">
+                                {[
+                                    { label: "Urgent", field: "urgent", color: "#EF4444" },
+                                    { label: "Important", field: "important", color: C.gold },
+                                ].map(f => (
+                                    <div key={f.field}
+                                        onClick={() => setNewTask(p => ({ ...p, [f.field]: !p[f.field] }))}
+                                        className="flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition-all"
+                                        style={{
+                                            background: newTask[f.field] ? `${f.color}12` : "rgba(255,255,255,0.03)",
+                                            border: `1px solid ${newTask[f.field] ? `${f.color}40` : C.border}`,
+                                        }}>
+                                        <span className="text-[11px] font-mono" style={{ color: newTask[f.field] ? f.color : C.muted }}>
+                                            {f.label}
+                                        </span>
+                                        <div className="w-8 h-4 rounded-full p-0.5 transition-all"
+                                            style={{ background: newTask[f.field] ? f.color : "rgba(255,255,255,0.1)" }}>
+                                            <div className="w-3 h-3 bg-white rounded-full transition-all"
+                                                style={{ transform: newTask[f.field] ? "translateX(16px)" : "translateX(0)" }} />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
                             <button onClick={handleAddTask}
                                 className="w-full py-2.5 rounded-[10px] border-none text-white text-[13px] font-bold cursor-pointer"
                                 style={{ background: C.accent }}>
@@ -607,7 +909,7 @@ export default function PlannerPage() {
                                 <div className="pl-11 pt-2 min-h-[600px] relative">
                                     {displayTasks
                                         .slice()
-                                        .sort((a, b) => a.time.localeCompare(b.time))
+                                        .sort((a, b) => (a.time || a.scheduledAt || "").localeCompare(b.time || b.scheduledAt || ""))
                                         .map((task, i) => {
                                             const isActive = nowMinutes >= timeToMinutes(task.time) && nowMinutes < timeToMinutes(task.end);
                                             const isFallback = FALLBACK_TASKS.find(f => f.id === task.id);
@@ -628,6 +930,7 @@ export default function PlannerPage() {
                                                                 onDelete={handleDelete}
                                                                 expanded={expandedId === task.id}
                                                                 isFirestore={!isFallback && !!uid}
+                                                                onMatrixToggle={handleMatrixToggle}
                                                             />
                                                         </div>
                                                     </div>
@@ -649,6 +952,19 @@ export default function PlannerPage() {
                                 <VectorView tasks={displayTasks} />
                             </div>
                         )}
+
+                        {activeView === "matrix" && (
+                            <div className="h-[calc(100vh-120px)]">
+                                <MatrixView
+                                    tasks={displayTasks}
+                                    onMatrixToggle={handleMatrixToggle}
+                                    onComplete={handleComplete}
+                                    onDelete={handleDelete}
+                                    uid={uid}
+                                />
+                            </div>
+                        )}
+
                     </div>
 
                     {/* ── AGENT CONSOLE ── */}
@@ -755,6 +1071,69 @@ export default function PlannerPage() {
                     </div>
                 </div>
             </div>
+            {showRescheduleModal && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center"
+                    style={{ background: "rgba(0,0,0,0.7)" }}>
+                    <div className="rounded-2xl p-6 w-[360px]"
+                        style={{ background: "#0C2D5E", border: "1px solid rgba(239,68,68,0.2)" }}>
+
+                        <h3 className="text-[15px] font-bold m-0 mb-1 text-white">Mark Day As</h3>
+                        <p className="text-[11px] font-mono mb-4 m-0" style={{ color: C.muted }}>
+                            Incomplete tasks will be redistributed across the next 4 days.
+                        </p>
+
+                        <div className="grid grid-cols-3 gap-2 mb-5">
+                            {["Sick", "Burned Out", "Holiday"].map(status => (
+                                <button key={status}
+                                    onClick={() => setPendingStatus(status)}
+                                    className="py-2.5 rounded-xl text-[11px] font-bold border-none cursor-pointer transition-all"
+                                    style={{
+                                        background: pendingStatus === status ? "rgba(239,68,68,0.15)" : "rgba(255,255,255,0.04)",
+                                        border: `1px solid ${pendingStatus === status ? "rgba(239,68,68,0.4)" : C.border}`,
+                                        color: pendingStatus === status ? "#EF4444" : C.muted,
+                                    }}>
+                                    {status}
+                                </button>
+                            ))}
+                        </div>
+
+                        {pendingStatus && (
+                            <div className="px-3 py-2.5 rounded-xl mb-4"
+                                style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)" }}>
+                                <p className="text-[11px] font-mono m-0" style={{ color: "rgba(239,68,68,0.8)" }}>
+                                    This will move {tasks.filter(t => !t.completed).length} incomplete task(s) across the next 4 days.
+                                </p>
+                            </div>
+                        )}
+
+                        <div className="flex gap-2">
+                            <button onClick={() => { setShowRescheduleModal(false); setPendingStatus(null); }}
+                                className="flex-1 py-2.5 rounded-xl text-[12px] font-bold cursor-pointer border-none"
+                                style={{ background: "rgba(255,255,255,0.05)", color: C.muted }}>
+                                Cancel
+                            </button>
+                            <button
+                                disabled={!pendingStatus || rescheduling}
+                                onClick={async () => {
+                                    if (!pendingStatus || !uid) return;
+                                    setRescheduling(true);
+                                    await rescheduleDay(uid, pendingStatus);
+                                    setDayStatus(pendingStatus);
+                                    setRescheduling(false);
+                                    setShowRescheduleModal(false);
+                                    setPendingStatus(null);
+                                }}
+                                className="flex-[2] py-2.5 rounded-xl text-[12px] font-bold cursor-pointer border-none transition-all"
+                                style={{
+                                    background: pendingStatus ? "rgba(239,68,68,0.8)" : "rgba(255,255,255,0.05)",
+                                    color: pendingStatus ? "white" : C.dim,
+                                }}>
+                                {rescheduling ? "Redistributing..." : "Confirm & Reschedule"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

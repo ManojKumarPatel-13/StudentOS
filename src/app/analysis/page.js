@@ -12,6 +12,7 @@ import {
     formatDateLabel, getDateRange, getUserStats, getAILogs,
     buildHeatmap, computeRadarData, subscribeToStats,
     subscribeToSessions, generateAndSaveAILogs,
+    computeTimeOfDayStats, computeConsistencyScore,
 } from "@/lib/services/analysisService";
 
 // ── THEME ─────────────────────────────────────────────────────────────────────
@@ -163,6 +164,15 @@ function SectionLabel({ text }) {
     return <p style={{ fontSize: 9, letterSpacing: "0.22em", color: T.muted, textTransform: "uppercase", fontFamily: "monospace", marginBottom: 4 }}>{text}</p>;
 }
 
+function formatLogTime(log) {
+    if (log.time) return log.time; // old format or FB_LOGS fallback
+    if (log.createdAt?.toDate) {
+        const d = log.createdAt.toDate();
+        return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    }
+    return "--:--";
+}
+
 // ── MAIN PAGE ─────────────────────────────────────────────────────────────────
 export default function AnalysisPage() {
     const { user } = useAuth();
@@ -180,6 +190,28 @@ export default function AnalysisPage() {
     const [loading, setLoading] = useState(false);
     const [hasData, setHasData] = useState(false);
     const logRef = useRef(null);
+    const [consistencyScore, setConsistencyScore] = useState(0);
+    const [timeStats, setTimeStats] = useState(null);
+
+    const [logsLoading, setLogsLoading] = useState(false);
+
+    const loadLogs = async (force = false) => {
+        if (!uid) { setAiLogs(FB_LOGS); return; }
+        setLogsLoading(true);
+        try {
+            // Try to generate fresh logs (respects daily cache unless forced)
+            await generateAndSaveAILogs(uid, force);
+            const logs = await getAILogs(uid, 15);
+            setAiLogs(logs.length ? logs : FB_LOGS);
+        } catch {
+            setAiLogs(FB_LOGS);
+        }
+        setLogsLoading(false);
+    };
+
+    useEffect(() => {
+        loadLogs(false);
+    }, [uid])
 
     // ── Real-time stats listener ───────────────────────────────────────────
     useEffect(() => {
@@ -446,16 +478,29 @@ export default function AnalysisPage() {
                     <Card style={{ background: "rgba(6,13,26,0.9)", display: "flex", flexDirection: "column" }}>
                         <div style={{ marginBottom: 14 }}>
                             <SectionLabel text="Neural Sidebar" />
-                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                <h2 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>AI Observation Log</h2>
-                                <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#10B981", animation: "pulseDot 1.5s infinite" }} />
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                    <h2 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>AI Observation Log</h2>
+                                    <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#10B981", animation: "pulseDot 1.5s infinite" }} />
+                                </div>
+                                <button
+                                    onClick={() => loadLogs(true)}
+                                    disabled={logsLoading}
+                                    style={{
+                                        fontSize: 10, padding: "3px 10px", borderRadius: 100, cursor: "pointer",
+                                        background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.2)",
+                                        color: logsLoading ? T.dim : "#10B981", fontFamily: "monospace",
+                                        transition: "all 0.2s",
+                                    }}>
+                                    {logsLoading ? "Analysing..." : "↻ Refresh"}
+                                </button>
                             </div>
                         </div>
                         <div ref={logRef} style={{ flex: 1, overflowY: "auto", maxHeight: 280, display: "flex", flexDirection: "column", gap: 6 }}>
                             {visibleLogs.map((log, i) => (
                                 <div key={i} className="log-entry" style={{ padding: "8px 10px", background: "rgba(12,45,94,0.3)", borderRadius: 8, borderLeft: `2px solid ${LOG_COLORS[log.type] || T.accent}` }}>
                                     <div style={{ display: "flex", gap: 8, marginBottom: 3, alignItems: "center" }}>
-                                        <span style={{ fontSize: 9, color: T.dim, fontFamily: "monospace" }}>{log.time}</span>
+                                        <span style={{ fontSize: 9, color: T.dim, fontFamily: "monospace" }}>{formatLogTime(log)}</span>
                                         <span style={{ fontSize: 9, color: LOG_COLORS[log.type], fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.06em" }}>[{log.type}]</span>
                                     </div>
                                     <p style={{ fontSize: 11, color: "rgba(245,240,232,0.65)", fontFamily: "monospace", lineHeight: 1.55, margin: 0 }}>{log.msg}</p>
@@ -477,8 +522,10 @@ export default function AnalysisPage() {
                     </Card>
                 </div>
 
-                {/* ── BOTTOM STATS ── */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
+                {/* ── BOTTOM STATS — 6 cards ── */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginTop: 16 }}>
+
+                    {/* Existing 4 cards — keep as-is */}
                     {[
                         { label: "Study Streak", value: stats.streak || 0, unit: "days", color: T.gold, sub: stats.streak >= 7 ? "🔥 Week streak!" : "Keep going daily" },
                         { label: "Total Hours", value: stats.totalHours || 0, unit: "hrs", color: "#00C8FF", sub: "All time" },
@@ -493,6 +540,64 @@ export default function AnalysisPage() {
                             <p style={{ fontSize: 10, color: T.dim, marginTop: 6, fontFamily: "monospace" }}>{stat.sub}</p>
                         </Card>
                     ))}
+
+                    {/* NEW — Consistency Score with ring */}
+                    <Card style={{ padding: "18px 20px", display: "flex", gap: 16, alignItems: "center" }}>
+                        {/* SVG ring */}
+                        <svg width={64} height={64} style={{ flexShrink: 0 }}>
+                            <circle cx={32} cy={32} r={26} fill="none" stroke="rgba(16,185,129,0.1)" strokeWidth={5} />
+                            <circle cx={32} cy={32} r={26} fill="none"
+                                stroke="#10B981" strokeWidth={5}
+                                strokeDasharray={`${2 * Math.PI * 26}`}
+                                strokeDashoffset={`${2 * Math.PI * 26 * (1 - consistencyScore / 100)}`}
+                                strokeLinecap="round"
+                                transform="rotate(-90 32 32)"
+                                style={{ transition: "stroke-dashoffset 1s ease" }}
+                            />
+                            <text x={32} y={37} textAnchor="middle" fill="#10B981"
+                                fontSize={13} fontWeight={700} fontFamily="monospace">
+                                {consistencyScore}
+                            </text>
+                        </svg>
+                        <div>
+                            <p style={{ fontSize: 9, letterSpacing: "0.18em", color: T.dim, textTransform: "uppercase", fontFamily: "monospace", marginBottom: 4 }}>Consistency Score</p>
+                            <p style={{ fontSize: 13, color: "#10B981", fontWeight: 700, marginBottom: 4 }}>
+                                {consistencyScore >= 80 ? "Exceptional 🔥" : consistencyScore >= 60 ? "On Track ✓" : consistencyScore >= 40 ? "Building" : "Just Starting"}
+                            </p>
+                            <p style={{ fontSize: 10, color: T.dim, fontFamily: "monospace" }}>Based on last 14 days</p>
+                        </div>
+                    </Card>
+
+                    {/* NEW — Best Study Window */}
+                    <Card style={{ padding: "18px 20px" }}>
+                        <p style={{ fontSize: 9, letterSpacing: "0.18em", color: T.dim, textTransform: "uppercase", fontFamily: "monospace", marginBottom: 8 }}>Best Study Window</p>
+                        {timeStats ? (
+                            <>
+                                <p style={{ fontSize: 18, fontWeight: 700, color: T.gold, margin: 0 }}>
+                                    {timeStats.bestWindow}
+                                </p>
+                                <p style={{ fontSize: 10, color: T.dim, marginTop: 6, fontFamily: "monospace" }}>
+                                    Avg focus: {timeStats.bestFocus}% in this window
+                                </p>
+                                <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+                                    {timeStats.windows.slice(0, 3).map(w => (
+                                        <span key={w.label} style={{
+                                            fontSize: 9, padding: "2px 7px", borderRadius: 100,
+                                            background: w.label === timeStats.bestWindow ? "rgba(201,168,76,0.15)" : "rgba(255,255,255,0.04)",
+                                            border: `1px solid ${w.label === timeStats.bestWindow ? "rgba(201,168,76,0.4)" : T.border}`,
+                                            color: w.label === timeStats.bestWindow ? T.gold : T.muted,
+                                            fontFamily: "monospace",
+                                        }}>{w.label.split(" ")[0]} {w.avgFocus}%</span>
+                                    ))}
+                                </div>
+                            </>
+                        ) : (
+                            <p style={{ fontSize: 12, color: T.dim, fontFamily: "monospace" }}>
+                                Complete 3+ sessions to see your peak window
+                            </p>
+                        )}
+                    </Card>
+
                 </div>
 
             </main>

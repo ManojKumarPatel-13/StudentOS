@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Search, Plus, CheckCircle2, Play, Pause, Square, Sparkles } from "lucide-react";
 import Sidebar from "@/components/shared/sidebar";
 import { useAuth } from "@/context/authContext";
+import { getProactiveMessage } from "@/lib/services/mentorService";
 import {
     subscribeTodaysTasks,
     subscribeToSystemLogs,
@@ -223,6 +224,8 @@ export default function HomePage() {
     const [newTask, setNewTask] = useState({ title: "", subject: "", scheduledAt: "09:00", energyLevel: "Medium" });
     const snapDebounce = useRef(null);
     const [taskFilter, setTaskFilter] = useState("all");
+    const [mentorAlert, setMentorAlert] = useState(null);
+    const [alertDismissed, setAlertDismissed] = useState(false);
 
     // Derived
     const done = tasks.filter(t => t.completed).length;
@@ -240,6 +243,12 @@ export default function HomePage() {
         if (taskFilter === "pending") return !t.completed;
         return true;
     });
+
+
+    useEffect(() => {
+        if (!uid) return;
+        getProactiveMessage(uid).then(setMentorAlert);
+    }, [uid]);
 
     // ── Clock tick ──
     useEffect(() => {
@@ -315,7 +324,7 @@ export default function HomePage() {
 
     const handleComplete = async (task) => {
         if (uid && !task.id.startsWith("l")) {
-            await markTaskComplete(uid, task.id, task.title);
+            await markTaskComplete(uid, task.id, task.title, task.subject || "General");
         } else {
             setTasks(p => p.map(t => t.id === task.id ? { ...t, completed: true } : t));
         }
@@ -393,6 +402,20 @@ export default function HomePage() {
 
             {/* ── SIDEBAR ── */}
             <Sidebar activePage="home" />
+
+            {mentorAlert && !alertDismissed && (
+                <div className="mx-10 mt-6 p-4 rounded-2xl flex items-start gap-4"
+                    style={{ background: "rgba(201,168,76,0.08)", border: "1px solid rgba(201,168,76,0.25)" }}>
+                    <Sparkles size={16} className="text-[#C9A84C] mt-0.5 flex-shrink-0" />
+                    <p className="text-sm text-[#F5F0E8]/70 flex-1 leading-relaxed"
+                        dangerouslySetInnerHTML={{ __html: mentorAlert.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }}
+                    />
+                    <button onClick={() => setAlertDismissed(true)}
+                        className="text-white/20 hover:text-white transition-colors flex-shrink-0 text-lg leading-none">
+                        ×
+                    </button>
+                </div>
+            )}
 
             {/* ── MAIN CONTENT ── */}
             <main className="flex-1 ml-64 flex flex-col min-w-0 relative z-10">

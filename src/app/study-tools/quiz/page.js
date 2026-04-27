@@ -4,7 +4,11 @@ import { ArrowLeft, Zap, Trophy, RotateCcw, Clock, Target, Check, X, Loader, Che
 import Sidebar from "@/components/shared/sidebar";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/authContext";
-import { saveQuizResult, getQuizResults } from "@/lib/services/toolsService";
+import {
+  saveQuizResult, getQuizResults,
+  getRecommendedDifficulty, saveWeakAreas, getWeakAreas, getSavedNotes
+} from "@/lib/services/toolsService";
+
 
 // ── QUIZ SETUP PAGE ───────────────────────────────────────────────────────────
 function QuizSetup({ onStart }) {
@@ -14,6 +18,9 @@ function QuizSetup({ onStart }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
+  const [recommendation, setRecommendation] = useState(null); // {level, reason}
+  const { user } = useAuth();
+  const uid = user?.uid;
 
   const DIFFICULTIES = [
     { key: "Easy", color: "#10B981", glow: "rgba(16,185,129,0.15)" },
@@ -29,14 +36,16 @@ function QuizSetup({ onStart }) {
     setLoading(true);
     setError("");
     try {
+      const weakAreas = uid ? await getWeakAreas(uid, topic) : [];
+
       const res = await fetch("/api/quiz", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic, difficulty, questions: count }),
+        body: JSON.stringify({ topic, difficulty, questions: count, weakAreas }),
       });
       const data = await res.json();
       if (data.success && data.quiz?.length) {
-        onStart(data.quiz, topic, difficulty);
+        onStart(data.quiz, topic, difficulty, examModeOn);
       } else {
         setError("Failed to generate quiz. Try a different topic.");
       }
@@ -44,6 +53,17 @@ function QuizSetup({ onStart }) {
       setError("Network error. Please check your connection.");
     }
     setLoading(false);
+  };
+
+  const handleTopicBlur = async () => {
+    if (!topic.trim() || !uid) return;
+    const rec = await getRecommendedDifficulty(uid, topic);
+    if (rec) {
+      setRecommendation(rec);
+      setDifficulty(rec.level); // auto-select recommended difficulty
+    } else {
+      setRecommendation(null);
+    }
   };
 
   return (
@@ -89,13 +109,13 @@ function QuizSetup({ onStart }) {
               {/* Topic */}
               <div className="mb-5">
                 <label className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/30 block mb-2">Topic</label>
-                <input value={topic} onChange={e => setTopic(e.target.value)}
+                <input value={topic} onChange={e => { setTopic(e.target.value); setRecommendation(null); }}
                   onKeyDown={e => e.key === "Enter" && handleGenerate()}
+                  onBlur={handleTopicBlur}
                   placeholder="e.g. Binary Trees, Thermodynamics, React Hooks..."
                   className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all placeholder:text-white/15 font-mono"
                   style={{ background: "rgba(10,22,40,0.6)", border: "1px solid rgba(24,95,165,0.2)", color: "white" }}
                   onFocus={e => e.target.style.borderColor = "rgba(16,185,129,0.4)"}
-                  onBlur={e => e.target.style.borderColor = "rgba(24,95,165,0.2)"}
                 />
                 <div className="flex flex-wrap gap-2 mt-3">
                   {QUICK_TOPICS.map(t => (
@@ -107,6 +127,22 @@ function QuizSetup({ onStart }) {
                   ))}
                 </div>
               </div>
+
+              {recommendation && (
+                <div className="flex items-center gap-2 mt-3 px-3 py-2 rounded-xl"
+                  style={{ background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.2)" }}>
+                  <span style={{ color: "#10B981", fontSize: 11 }}>⚡</span>
+                  <p className="text-[11px] font-mono" style={{ color: "#10B981" }}>
+                    Astra recommends <strong>{recommendation.level}</strong> — {recommendation.reason}
+                  </p>
+                  <button
+                    onClick={() => { setDifficulty(recommendation.level); }}
+                    className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-lg transition-all"
+                    style={{ background: "rgba(16,185,129,0.15)", color: "#10B981" }}>
+                    Apply
+                  </button>
+                </div>
+              )}
 
               {/* Difficulty */}
               <div className="mb-5">
@@ -141,6 +177,23 @@ function QuizSetup({ onStart }) {
                       {n} Qs
                     </button>
                   ))}
+                </div>
+              </div>
+
+              {/* Exam Mode toggle */}
+              <div className="flex items-center justify-between p-4 rounded-2xl mb-2"
+                style={{ background: "rgba(239,68,68,0.05)", border: "1px solid rgba(239,68,68,0.15)" }}>
+                <div>
+                  <p className="text-sm font-bold text-white">Exam Simulation Mode</p>
+                  <p className="text-[10px] font-mono text-white/30 mt-0.5">
+                    Hides sidebar · Blocks copy-paste · Locks to fullscreen
+                  </p>
+                </div>
+                <div
+                  onClick={() => onToggleExamMode?.()}
+                  className="w-11 h-6 rounded-full p-1 cursor-pointer transition-all flex items-center"
+                  style={{ background: examModeOn ? "#EF4444" : "rgba(255,255,255,0.1)" }}>
+                  <div className={`w-4 h-4 bg-white rounded-full transition-all ${examModeOn ? "translate-x-5" : ""}`} />
                 </div>
               </div>
 
@@ -254,6 +307,11 @@ function QuizPlay({ quiz, topic, difficulty, onFinish, onExit }) {
   const [showResult, setShowResult] = useState(false);
   const [time, setTime] = useState(30);
   const [finished, setFinished] = useState(false);
+  const [rootCauses, setRootCauses] = useState({});
+  const [rcLoading, setRcLoading] = useState(false);
+  const { user } = useAuth();
+  const uid = user?.uid;
+  const router = useRouter();
 
   const LETTERS = ["A", "B", "C", "D"];
 
@@ -267,6 +325,23 @@ function QuizPlay({ quiz, topic, difficulty, onFinish, onExit }) {
     }, 1000);
     return () => clearInterval(t);
   }, [current, finished]);
+
+  useEffect(() => {
+    if (!examMode) return;
+    // Enter fullscreen
+    document.documentElement.requestFullscreen?.().catch(() => { });
+    // Block copy-paste
+    const block = e => e.preventDefault();
+    document.addEventListener("copy", block);
+    document.addEventListener("paste", block);
+    document.addEventListener("cut", block);
+    return () => {
+      document.exitFullscreen?.().catch(() => { });
+      document.removeEventListener("copy", block);
+      document.removeEventListener("paste", block);
+      document.removeEventListener("cut", block);
+    };
+  }, [examMode]);
 
   const handleAnswer = (opt) => {
     if (showResult) return;
@@ -294,6 +369,47 @@ function QuizPlay({ quiz, topic, difficulty, onFinish, onExit }) {
   if (finished) {
     const pct = Math.round((score / quiz.length) * 100);
     const color = pct >= 70 ? "#10B981" : pct >= 50 ? "#C9A84C" : "#EF4444";
+
+    useEffect(() => {
+      if (!finished) return;
+      const wrongIndexes = quiz
+        .map((q, i) => ({ q, i }))
+        .filter(({ q, i }) => answers[i] !== q.answer);
+
+      if (!wrongIndexes.length) return;
+      setRcLoading(true);
+
+      // Fetch saved note titles from Firestore to match against
+      const fetchCauses = async () => {
+        const savedNotes = uid
+          ? await getSavedNotes(uid).catch(() => [])
+          : [];
+        const noteTitles = savedNotes.map(n => n.topic);
+
+        const results = await Promise.all(
+          wrongIndexes.map(async ({ q, i }) => {
+            const res = await fetch("/api/rootcause", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                wrongQuestion: q.question,
+                topic,
+                savedNoteTitles: noteTitles,
+              }),
+            });
+            const data = await res.json();
+            return { index: i, ...data };
+          })
+        );
+
+        const map = {};
+        results.forEach(r => { map[r.index] = r; });
+        setRootCauses(map);
+        setRcLoading(false);
+      };
+
+      fetchCauses();
+    }, [finished]);
 
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8" style={{ animation: "fadeUp 0.4s ease both" }}>
@@ -331,7 +447,30 @@ function QuizPlay({ quiz, topic, difficulty, onFinish, onExit }) {
                     {!correct && <p className="text-[10px] font-mono" style={{ color: "#10B981" }}>✓ {item.answer}</p>}
                     {!correct && answers[i] && <p className="text-[10px] font-mono" style={{ color: "#EF4444" }}>✗ {answers[i]}</p>}
                   </div>
+                  {!correct && (
+                    <div className="mt-2">
+                      {rootCauses[i] ? (
+                        <div className="rounded-xl p-3 mt-1"
+                          style={{ background: "rgba(239,68,68,0.05)", border: "1px solid rgba(239,68,68,0.1)" }}>
+                          <p className="text-[10px] font-mono text-white/40 mb-1">🔍 Why you got this wrong</p>
+                          <p className="text-xs text-white/60">{rootCauses[i].reason}</p>
+                          {rootCauses[i].relatedNote && rootCauses[i].relatedNote !== "none" && (
+                            <button
+                              onClick={() => router.push(`/study-tools/note?topic=${encodeURIComponent(rootCauses[i].relatedNote)}`)}
+                              className="mt-2 text-[10px] font-bold px-3 py-1 rounded-lg transition-all"
+                              style={{ background: "rgba(201,168,76,0.1)", border: "1px solid rgba(201,168,76,0.2)", color: "#C9A84C" }}>
+                              📖 Review in Notes: {rootCauses[i].relatedNote} →
+                            </button>
+                          )}
+                        </div>
+                      ) : rcLoading ? (
+                        <p className="text-[10px] font-mono text-white/20 mt-1">Analysing mistake...</p>
+                      ) : null}
+                    </div>
+                  )}
                 </div>
+
+
               );
             })}
           </div>
@@ -342,7 +481,12 @@ function QuizPlay({ quiz, topic, difficulty, onFinish, onExit }) {
               style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.5)" }}>
               Exit
             </button>
-            <button onClick={() => onFinish(score, quiz.length)}
+            <button onClick={() => {
+              const wrong = quiz
+                .filter((q, i) => answers[i] !== q.answer)
+                .map(q => q.question);
+              onFinish(score, quiz.length, wrong);
+            }}
               className="flex-[2] py-3 rounded-xl text-sm font-black transition-all flex items-center justify-center gap-2"
               style={{ background: "linear-gradient(135deg, #10B981, #059669)", color: "white", boxShadow: "0 4px 20px rgba(16,185,129,0.25)" }}>
               <RotateCcw size={14} /> Try Again
@@ -448,13 +592,22 @@ export default function QuizPage() {
   const [quiz, setQuiz] = useState(null);
   const [topic, setTopic] = useState("");
   const [difficulty, setDifficulty] = useState("Medium");
+  const [examMode, setExamMode] = useState(false);
 
-  const handleStart = (q, t, d) => { setQuiz(q); setTopic(t); setDifficulty(d); };
+  const handleStart = (q, t, d, exam) => {
+    setQuiz(q); setTopic(t); setDifficulty(d); setExamMode(exam);
+  };
 
-  const handleFinish = async (score, total) => {
-    if (uid) await saveQuizResult(uid, topic, difficulty, score, total);
+  const handleFinish = async (score, total, wrongQuestions) => {
+    if (uid) {
+      await saveQuizResult(uid, topic, difficulty, score, total);
+      if (wrongQuestions?.length) {
+        await saveWeakAreas(uid, topic, wrongQuestions);
+      }
+    }
     setQuiz(null);
   };
+
 
   const handleExit = () => setQuiz(null);
 
@@ -472,8 +625,8 @@ export default function QuizPage() {
         <QuizSetup onStart={handleStart} />
       ) : (
         <>
-          <Sidebar activePage="tools" />
-          <div className="flex-1 ml-64 flex flex-col h-screen">
+          {!examMode && <Sidebar activePage="tools" />}
+          <div className={`flex-1 ${examMode ? "ml-0" : "ml-64"} flex flex-col h-screen`}>
             <header className="flex items-center justify-between px-8 py-4 flex-shrink-0"
               style={{ background: "rgba(10,22,40,0.9)", borderBottom: "1px solid rgba(16,185,129,0.12)", backdropFilter: "blur(20px)" }}>
               <div className="flex items-center gap-3">
@@ -487,7 +640,8 @@ export default function QuizPage() {
                 </div>
               </div>
             </header>
-            <QuizPlay quiz={quiz} topic={topic} difficulty={difficulty} onFinish={handleFinish} onExit={handleExit} />
+            <QuizPlay quiz={quiz} topic={topic} difficulty={difficulty}
+              onFinish={handleFinish} onExit={handleExit} examMode={examMode} />
           </div>
         </>
       )}

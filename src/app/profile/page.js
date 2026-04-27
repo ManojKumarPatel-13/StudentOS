@@ -12,6 +12,7 @@ import Sidebar from '@/components/shared/sidebar';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useAuth } from '@/context/authContext';
+import { getCareerSuggestions } from "@/lib/services/mentorService";
 import {
     loadFullProfile,
     subscribeToProfileStats,
@@ -60,6 +61,8 @@ export default function ProfilePage() {
     const [isDeleteMode, setIsDeleteMode] = useState(false);
     const [newSkill, setNewSkill] = useState('');
     const [showSkillInput, setShowSkillInput] = useState(false);
+    const [careerSuggestions, setCareerSuggestions] = useState([]);
+    const [careerLoading, setCareerLoading] = useState(false);
 
     // Account
     const [account, setAccount] = useState({
@@ -89,6 +92,14 @@ export default function ProfilePage() {
 
     // Modals
     const [isModalOpen, setIsModalOpen] = useState(false);
+
+
+    useEffect(() => {
+        if (!user) return;
+        getCareerSuggestions(user.uid, { branch: heroData.major }).then(s => {
+            if (s) setCareerSuggestions(s);
+        });
+    }, [user, heroData.major]);
 
     // ── LOAD DATA ──────────────────────────────────────────────────────────────
     useEffect(() => {
@@ -461,6 +472,47 @@ export default function ProfilePage() {
                                 </div>
                             ))}
                         </div>
+                    </div>
+
+                    {/* Career Roadmap */}
+                    <div className="bg-[#0C2D5E]/20 border border-[#185FA5]/10 rounded-[40px] p-8 backdrop-blur-xl">
+                        <div className="flex justify-between items-center mb-8">
+                            <h3 className="text-xl font-black text-white flex items-center gap-3">
+                                🎯 Career Roadmap
+                            </h3>
+                            <button
+                                onClick={async () => {
+                                    setCareerLoading(true);
+                                    // Force refresh by clearing cache not needed — just refetch
+                                    const s = await getCareerSuggestions(user.uid, { branch: heroData.major });
+                                    if (s) setCareerSuggestions(s);
+                                    setCareerLoading(false);
+                                }}
+                                className="text-xs font-bold px-4 py-2 rounded-2xl text-blue-400 border border-[#185FA5]/30 hover:bg-[#185FA5]/20 transition-all">
+                                {careerLoading ? "Loading..." : "↻ Refresh"}
+                            </button>
+                        </div>
+
+                        {careerSuggestions.length === 0 ? (
+                            <p className="text-[#F5F0E8]/30 text-sm italic text-center py-4">
+                                {careerLoading ? "Astra is mapping your career path..." : "Take a few quizzes first — Astra will suggest certifications based on your topics."}
+                            </p>
+                        ) : (
+                            <div className="space-y-4">
+                                {careerSuggestions.map((cert, i) => (
+                                    <div key={i} className="bg-[#0A1628]/40 border border-[#185FA5]/10 rounded-3xl p-5 flex items-center justify-between group hover:border-[#185FA5]/30 transition-all">
+                                        <div>
+                                            <p className="font-bold text-white text-sm">{cert.title}</p>
+                                            <p className="text-[#F5F0E8]/40 text-xs mt-1">{cert.provider} · {cert.duration}</p>
+                                        </div>
+                                        <a href={cert.link} target="_blank" rel="noopener noreferrer"
+                                            className="px-4 py-2 rounded-2xl text-xs font-bold text-blue-400 border border-[#185FA5]/30 hover:bg-[#185FA5]/20 transition-all opacity-0 group-hover:opacity-100">
+                                            Learn More →
+                                        </a>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     {/* ── SETTINGS HEADER ───────────────────────────────────── */}

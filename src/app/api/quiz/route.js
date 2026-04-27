@@ -2,7 +2,11 @@ export async function POST(req) {
   try {
     console.log("👉 API HIT");
 
-    const { topic, difficulty, questions } = await req.json();
+    const { topic, difficulty, questions, weakAreas } = await req.json();
+
+    const weakAreaBlock = weakAreas?.length
+      ? `\nFocus at least 40% of questions on these specific weak areas the student got wrong before:\n${weakAreas.map((q, i) => `${i + 1}. ${q}`).join("\n")}`
+      : "";
 
     const API_KEY = process.env.OPENROUTER_API_KEY;
 
@@ -12,7 +16,7 @@ export async function POST(req) {
 
     const prompt = `
 Generate ${questions} multiple choice questions on "${topic}".
-Difficulty: ${difficulty}
+Difficulty: ${difficulty}${weakAreaBlock}
 
 Return ONLY JSON like this:
 [

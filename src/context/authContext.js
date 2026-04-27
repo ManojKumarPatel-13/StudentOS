@@ -6,7 +6,8 @@ import {
     onAuthStateChanged,
     signOut
 } from "firebase/auth";
-import { auth } from "@/lib/firebase"; // Ensure your firebase config path is correct
+import { auth } from "@/lib/firebase";
+import { initializeProfileIfNew } from "@/lib/services/profileService"; // ← ADD
 
 const AuthContext = createContext();
 
@@ -15,8 +16,12 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-            setUser(user);
+        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+            if (firebaseUser) {
+                // STEP 3 FIX — create Firestore docs for new users on any login
+                await initializeProfileIfNew(firebaseUser);
+            }
+            setUser(firebaseUser);
             setLoading(false);
         });
         return () => unsubscribe();

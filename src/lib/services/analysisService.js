@@ -261,9 +261,103 @@ export async function recalculateStats(uid) {
         }
 
         const ref = doc(db, "users", uid, "meta", "stats");
-        await setDoc(ref, { totalHours, avgFocusScore, streak, lastActiveDate: today }, { merge: true });
+        const consistencyScore = await computeConsistencyScore(uid);
+        const timeStats = await computeTimeOfDayStats(uid);
+
+        await setDoc(ref, {
+            totalHours,
+            avgFocusScore,
+            streak,
+            lastActiveDate: today,
+            consistencyScore,                               // ← ADD
+            bestStudyWindow: timeStats?.bestWindow || null, // ← ADD
+        }, { merge: true });
     } catch (e) {
         console.error("recalculateStats error:", e);
+    }
+}
+
+/**
+ * computeTimeOfDayStats()
+ * Groups sessions by time window and finds which window yields the best focus.
+ * Returns { bestWindow: string, windows: [{label, avgFocus, hours}] }
+ */
+export async function computeTimeOfDayStats(uid) {
+    if (!uid) return null;
+    try {
+        const sessions = await getAllSessions(uid);
+        const withHour = sessions.filter(s => s.startHour !== undefined);
+        if (withHour.length < 3) return null;
+
+        const windows = {
+            "Morning (6–12)": { hours: [], focus: [] },
+            "Afternoon (12–18)": { hours: [], focus: [] },
+            "Evening (18–24)": { hours: [], focus: [] },
+            "Night (0–6)": { hours: [], focus: [] },
+        };
+
+        withHour.forEach(s => {
+            const h = s.startHour;
+            const key =
+                h >= 6 && h < 12 ? "Morning (6–12)" :
+                    h >= 12 && h < 18 ? "Afternoon (12–18)" :
+                        h >= 18 && h < 24 ? "Evening (18–24)" :
+                            "Night (0–6)";
+            windows[key].hours.push(s.hours || 0);
+            windows[key].focus.push(s.focusScore || 0);
+        });
+
+        const results = Object.entries(windows)
+            .filter(([, d]) => d.focus.length > 0)
+            .map(([label, d]) => ({
+                label,
+                avgFocus: Math.round(d.focus.reduce((a, b) => a + b, 0) / d.focus.length),
+                totalHours: parseFloat(d.hours.reduce((a, b) => a + b, 0).toFixed(1)),
+                sessions: d.focus.length,
+            }))
+            .sort((a, b) => b.avgFocus - a.avgFocus);
+
+        return {
+            bestWindow: results[0]?.label || null,
+            bestFocus: results[0]?.avgFocus || 0,
+            windows: results,
+        };
+    } catch (e) {
+        console.error("computeTimeOfDayStats error:", e);
+        return null;
+    }
+}
+
+/**
+ * computeConsistencyScore()
+ * Score formula (0–100):
+ *   base = (unique study days in last 14) / 14 × 100
+ *   bonus = +5 for each 7-day streak (capped at 100)
+ */
+export async function computeConsistencyScore(uid) {
+    if (!uid) return 0;
+    try {
+        const sessions = await getAllSessions(uid);
+        const today = new Date();
+
+        // Unique days in last 14
+        const day14Str = new Date(today.getTime() - 14 * 86400000)
+            .toISOString().split("T")[0];
+        const uniqueDays14 = new Set(
+            sessions.filter(s => s.date >= day14Str).map(s => s.date)
+        ).size;
+
+        const base = Math.round((uniqueDays14 / 14) * 100);
+
+        // Streak bonus — read from meta/stats
+        const snap = await getDoc(doc(db, "users", uid, "meta", "stats"));
+        const streak = snap.exists() ? (snap.data().streak || 0) : 0;
+        const bonus = Math.floor(streak / 7) * 5;
+
+        return Math.min(100, base + bonus);
+    } catch (e) {
+        console.error("computeConsistencyScore error:", e);
+        return 0;
     }
 }
 
@@ -435,9 +529,18 @@ export async function writeAILog(uid, log) {
  *   - Estimated mastery ETA for most-studied subject
  *   - Consistency observation
  */
-export async function generateAndSaveAILogs(uid) {
+export async function generateAndSaveAILogs(uid, forceRegenerate = false) {
     if (!uid) return;
     try {
+        // Only regenerate once per day unless forced
+        if (!forceRegenerate) {
+            const today = new Date().toISOString().split("T")[0];
+            const cacheRef = doc(db, "users", uid, "meta", "logCache");
+            const cached = await getDoc(cacheRef);
+            if (cached.exists() && cached.data().date === today) return;
+            await setDoc(cacheRef, { date: today }, { merge: true });
+        }
+
         const sessions = await getAllSessions(uid);
         if (sessions.length < 2) return;
 

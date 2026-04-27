@@ -1,10 +1,12 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ArrowLeft, FileText, ImageIcon, FileDown, Copy, RefreshCw, Save, Check, Loader, BookOpen, Clock } from "lucide-react";
 import Sidebar from "@/components/shared/sidebar";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/authContext";
-import { saveNote, getSavedNotes } from "@/lib/services/toolsService";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { saveNote, getSavedNotes, findAndSaveRelatedNotes } from "@/lib/services/toolsService";
 
 export default function NotesPage() {
   const router = useRouter();
@@ -17,6 +19,12 @@ export default function NotesPage() {
   const [loading, setLoading] = useState(false);
   const [savedNotes, setSavedNotes] = useState([]);
   const [selectedNote, setSelectedNote] = useState(null);
+  const [flashcards, setFlashcards] = useState([]);
+  const [flashMode, setFlashMode] = useState(false);
+  const [cardIndex, setCardIndex] = useState(0);
+  const [flipped, setFlipped] = useState(false);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [relatedNotes, setRelatedNotes] = useState([]);
 
   // Button states
   const [copied, setCopied] = useState(false);
@@ -59,10 +67,14 @@ export default function NotesPage() {
 
   const handleSave = async () => {
     if (!notes || !uid) return;
-    await saveNote(uid, topic, notes, mode);
+    const noteId = await saveNote(uid, topic, notes, mode);
     setSaved(true);
     getSavedNotes(uid).then(setSavedNotes);
     setTimeout(() => setSaved(false), 1500);
+    setTimeout(() => loadFlashcards(noteId), 3000);
+    const allNotes = await getSavedNotes(uid);
+    findAndSaveRelatedNotes(uid, noteId, topic, allNotes)
+      .then(related => { if (related?.length) setRelatedNotes(related); });
   };
 
   const handleDownload = () => {
@@ -74,11 +86,35 @@ export default function NotesPage() {
     a.click();
   };
 
+  const handleSummary = async () => {
+    if (!topic.trim()) return;
+    setSummaryLoading(true);
+    try {
+      const res = await fetch("/api/note", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic, mode: "summary" }),
+      });
+      const data = await res.json();
+      if (data.success) setNotes(data.notes);
+    } catch (e) { console.error(e); }
+    setSummaryLoading(false);
+  };
+
   const MODES = [
     { key: "text", label: "Text", icon: FileText },
     { key: "image", label: "Image", icon: ImageIcon },
     { key: "pdf", label: "PDF", icon: FileDown },
   ];
+
+  const loadFlashcards = async (noteId) => {
+    if (!uid || !noteId) return;
+    try {
+      const snap = await getDoc(doc(db, "users", uid, "flashcards", noteId));
+      if (snap.exists()) setFlashcards(snap.data().cards || []);
+      else setFlashcards([]);
+    } catch (e) { setFlashcards([]); }
+  };
 
   return (
     <div className="flex min-h-screen bg-[#0A1628] text-white" style={{ fontFamily: "'Syne', sans-serif" }}>
@@ -122,6 +158,8 @@ export default function NotesPage() {
                 { label: copied ? "Copied!" : "Copy", icon: copied ? Check : Copy, action: handleCopy, active: copied },
                 { label: "Download", icon: FileDown, action: handleDownload, active: false },
                 { label: saved ? "Saved!" : "Save", icon: saved ? Check : Save, action: handleSave, active: saved },
+                { label: summaryLoading ? "Loading..." : "5-min Read", icon: Clock, action: handleSummary, active: false },
+                { label: "Flashcards", icon: BookOpen, action: () => { setFlashMode(f => !f); setCardIndex(0); setFlipped(false); }, active: flashMode },
               ].map(b => (
                 <button key={b.label} onClick={b.action}
                   className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-[11px] font-bold transition-all"
@@ -219,7 +257,14 @@ export default function NotesPage() {
                 </div>
                 <div className="space-y-2">
                   {savedNotes.slice(0, 5).map((n, i) => (
-                    <button key={i} onClick={() => { setSelectedNote(n); setNotes(n.content); setTopic(n.topic); }}
+                    <button key={i} onClick={() => {
+                      setSelectedNote(n);
+                      setNotes(n.content);
+                      setTopic(n.topic);
+                      setFlashMode(false);
+                      loadFlashcards(n.id);
+                      setRelatedNotes(n.relatedNotes || []);
+                    }}
                       className="w-full text-left px-3 py-2 rounded-xl text-xs transition-all"
                       style={{
                         background: selectedNote?.id === n.id ? "rgba(201,168,76,0.1)" : "rgba(255,255,255,0.03)",
@@ -274,11 +319,132 @@ export default function NotesPage() {
                   style={{ fontFamily: "'JetBrains Mono', monospace" }}>
                   {notes}
                 </pre>
+                {/* Related Notes */}
+                {relatedNotes.length > 0 && (
+                  <div className="mt-6 pt-5" style={{ borderTop: "1px solid rgba(24,95,165,0.15)" }}>
+                    <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/30 mb-3">
+                      🔗 Knowledge Web — Related Notes
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {relatedNotes.map((n, i) => (
+                        <button key={i}
+                          onClick={() => {
+                            const found = savedNotes.find(s => s.id === n.id);
+                            if (found) {
+                              setSelectedNote(found);
+                              setNotes(found.content);
+                              setTopic(found.topic);
+                              setFlashMode(false);
+                              loadFlashcards(found.id);
+                              setRelatedNotes(found.relatedNotes || []);
+                            }
+                          }}
+                          className="flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold transition-all"
+                          style={{
+                            background: "rgba(24,95,165,0.1)",
+                            border: "1px solid rgba(24,95,165,0.25)",
+                            color: "rgba(255,255,255,0.6)",
+                          }}>
+                          <BookOpen size={11} className="opacity-50" />
+                          {n.topic}
+                          <span className="text-white/20">→</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
         </div>
-      </main>
-    </div>
+
+        {/* Flashcard overlay */}
+        {flashMode && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center"
+            style={{ background: "rgba(10,22,40,0.95)", backdropFilter: "blur(20px)" }}>
+
+            <button onClick={() => setFlashMode(false)}
+              className="absolute top-6 right-6 text-white/30 hover:text-white text-2xl transition-colors">
+              ×
+            </button>
+
+            <div className="text-center w-full max-w-lg px-6">
+              <p className="text-[10px] font-mono uppercase tracking-widest text-white/30 mb-6">
+                {topic} · Card {cardIndex + 1} of {flashcards.length}
+              </p>
+
+              {flashcards.length === 0 ? (
+                <div className="rounded-3xl p-10" style={{ background: "rgba(12,45,94,0.4)", border: "1px solid rgba(24,95,165,0.2)" }}>
+                  <p className="text-white/40 text-sm">Flashcards are being generated... Save the note first, then wait ~5 seconds.</p>
+                </div>
+              ) : (
+                <>
+                  {/* Flip card */}
+                  <div onClick={() => setFlipped(f => !f)} className="cursor-pointer"
+                    style={{ perspective: "1000px" }}>
+                    <div style={{
+                      transition: "transform 0.5s",
+                      transformStyle: "preserve-3d",
+                      transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)",
+                      position: "relative",
+                      height: "220px",
+                    }}>
+                      {/* Front */}
+                      <div style={{
+                        backfaceVisibility: "hidden",
+                        position: "absolute", inset: 0,
+                        background: "rgba(12,45,94,0.4)",
+                        border: "1px solid rgba(201,168,76,0.25)",
+                        borderRadius: "24px",
+                        display: "flex", alignItems: "center", justifyContent: "center", padding: "2rem",
+                      }}>
+                        <p className="text-lg font-bold text-white text-center leading-relaxed">
+                          {flashcards[cardIndex]?.front}
+                        </p>
+                      </div>
+                      {/* Back */}
+                      <div style={{
+                        backfaceVisibility: "hidden",
+                        transform: "rotateY(180deg)",
+                        position: "absolute", inset: 0,
+                        background: "rgba(201,168,76,0.08)",
+                        border: "1px solid rgba(201,168,76,0.4)",
+                        borderRadius: "24px",
+                        display: "flex", alignItems: "center", justifyContent: "center", padding: "2rem",
+                      }}>
+                        <p className="text-base text-[#C9A84C] text-center leading-relaxed">
+                          {flashcards[cardIndex]?.back}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="text-white/20 text-xs mt-4 mb-6">Click card to flip</p>
+
+                  {/* Navigation */}
+                  <div className="flex items-center justify-center gap-4">
+                    <button
+                      onClick={() => { setCardIndex(i => Math.max(0, i - 1)); setFlipped(false); }}
+                      disabled={cardIndex === 0}
+                      className="px-6 py-2.5 rounded-2xl font-bold text-sm transition-all disabled:opacity-20"
+                      style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "white" }}>
+                      ← Prev
+                    </button>
+                    <button
+                      onClick={() => { setCardIndex(i => Math.min(flashcards.length - 1, i + 1)); setFlipped(false); }}
+                      disabled={cardIndex === flashcards.length - 1}
+                      className="px-6 py-2.5 rounded-2xl font-bold text-sm transition-all disabled:opacity-20"
+                      style={{ background: "rgba(201,168,76,0.15)", border: "1px solid rgba(201,168,76,0.3)", color: "#C9A84C" }}>
+                      Next →
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+      </main >
+    </div >
   );
 }

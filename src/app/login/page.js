@@ -10,6 +10,7 @@ import { auth, googleProvider, githubProvider } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { Mail, Lock, User, ArrowRight, Sparkles } from 'lucide-react';
 import { FaGithub, FaGoogle } from 'react-icons/fa';
+import { initializeProfileIfNew } from "@/lib/services/profileService";
 
 export default function AuthPortal() {
     const [isLogin, setIsLogin] = useState(true);
@@ -24,7 +25,7 @@ export default function AuthPortal() {
         setLoading(true);
         try {
             const result = await signInWithPopup(auth, provider);
-            // "result.user" contains the authenticated user
+            await initializeProfileIfNew(result.user); // ← ADD
             router.push('/home');
         } catch (error) {
             console.error("Social Auth Error:", error.code);
@@ -49,11 +50,8 @@ export default function AuthPortal() {
             } else {
                 // SIGNUP WORKINGS
                 const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-
-                // Professional touch: Send verification email
                 await sendEmailVerification(userCredential.user);
-
-                // Redirect to onboarding to fill College/Branch
+                await initializeProfileIfNew(userCredential.user); // ← ADD
                 router.push('/onboarding');
             }
         } catch (error) {

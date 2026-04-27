@@ -43,6 +43,7 @@ export default function AIAssistantPage() {
     }
   }, [chats, thinking]);
 
+  // AFTER — replace the handleSend function
   const handleSend = async (overrideInput) => {
     const question = (overrideInput || input).trim();
     if (!question || thinking) return;
@@ -52,12 +53,30 @@ export default function AIAssistantPage() {
     setThinking(true);
 
     try {
-      const answer = await generatePlan(question);
+      // Build conversation history for context
+      const messages = [
+        ...chats.filter(c => c.a).flatMap(c => ([
+          { role: "user", text: c.q },
+          { role: "model", text: c.a },
+        ])),
+        { role: "user", text: question },
+      ];
+
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages }),
+      });
+
+      const data = await res.json();
+      const answer = data.reply || "I encountered an error. Please try again.";
+
       setChats(prev => {
         const updated = [...prev];
         updated[updated.length - 1].a = answer;
         return updated;
       });
+
       if (uid) await saveAIChat(uid, question, answer);
     } catch {
       setChats(prev => {
@@ -66,6 +85,7 @@ export default function AIAssistantPage() {
         return updated;
       });
     }
+
     setThinking(false);
     inputRef.current?.focus();
   };
